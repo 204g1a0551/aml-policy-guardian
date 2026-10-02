@@ -1,2 +1,0 @@
-Section 1: Hawala Detection Protocols
-Brokers using informal value transfer systems (IVTS) and Hawala Banking Brokerage Ring 9edc8777-801a-48ef-8a9d-861563d14265 frequently balance ledgers using third-party commercial trade invoices in high-risk free zones.

@@ -22,9 +22,13 @@ public class SecurityUserPrincipal implements UserDetails {
         this.username = user.getUsername();
         this.password = user.getPasswordHash();
         this.enabled = user.isEnabled();
-        this.authorities = user.getRoles().stream()
-            .map(role -> new SimpleGrantedAuthority(role.getName()))
-            .collect(Collectors.toSet());
+        this.authorities = user.getRoles() != null
+            ? user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toSet())
+            : java.util.Collections.emptySet();
+    }
+
+    public static SecurityUserPrincipal create(User user) {
+        return new SecurityUserPrincipal(user);
     }
 
     public UUID getId() {
