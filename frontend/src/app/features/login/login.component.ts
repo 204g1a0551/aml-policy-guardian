@@ -60,10 +60,10 @@ import { AuthService } from '../../core/services/auth.service';
         <div class="demo-hints">
           <p><strong>Demo Test Accounts:</strong></p>
           <div class="demo-buttons">
-            <button type="button" class="btn-chip" (click)="fillCredentials('analyst', 'AdminPass123!')">
+            <button type="button" class="btn-chip" (click)="fillCredentials('analyst', 'SecretPass123!')">
               FIU Analyst (analyst)
             </button>
-            <button type="button" class="btn-chip" (click)="fillCredentials('admin', 'AdminPass123!')">
+            <button type="button" class="btn-chip" (click)="fillCredentials('admin', 'SecretPass123!')">
               Compliance Admin (admin)
             </button>
           </div>
@@ -208,7 +208,7 @@ export class LoginComponent {
     this.authService.login({ username: this.username, password: this.password }).subscribe({
       next: () => {
         this.isLoading.set(false);
-        this.router.navigate(['/investigation']);
+        this.router.navigate(['/chat']);
       },
       error: (err) => {
         this.isLoading.set(false);

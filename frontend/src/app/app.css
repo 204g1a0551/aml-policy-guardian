@@ -10,66 +10,130 @@
   align-items: center;
   background: #0f172a;
   color: #ffffff;
-  padding: 0.85rem 2rem;
+  padding: 0.75rem 1.75rem;
   border-bottom: 2px solid #1e3a8a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .nav-brand {
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.bank-logo {
+.bank-symbol {
+  font-size: 1.5rem;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.bank-title {
   font-weight: 800;
-  font-size: 1.1rem;
-  letter-spacing: 0.05em;
-  color: #93c5fd;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  color: #60a5fa;
 }
 
 .nav-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #94a3b8;
 }
 
-.nav-links {
+.nav-center {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.5rem;
 }
 
-.nav-links a {
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   color: #cbd5e1;
   text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.3rem 0.6rem;
-  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  transition: all 0.15s;
 }
 
-.nav-links a:hover, .nav-links a.active-link {
+.nav-item:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
+  background: #1e293b;
+}
+
+.nav-item.active-link {
+  color: #ffffff;
+  background: #1e3a8a;
+}
+
+.nav-icon {
+  font-size: 1rem;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
 }
 
 .user-pill {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
   background: #1e293b;
   padding: 0.3rem 0.75rem;
   border-radius: 9999px;
-  font-size: 0.85rem;
+  border: 1px solid #334155;
+  font-size: 0.825rem;
+}
+
+.user-name {
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+.role-badge {
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.role-admin {
+  background: #7c3aed;
 }
 
 .btn-logout {
   background: #ef4444;
   color: white;
   border: none;
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.55rem;
   border-radius: 4px;
   font-size: 0.75rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-logout:hover {
+  background: #dc2626;
+}
+
+.signin-link {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.signin-link:hover {
+  background: #1d4ed8;
 }
 
 .main-content {

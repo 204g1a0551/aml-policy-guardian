@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     List<AuditLog> findByUserIdOrderByCreatedAtDesc(UUID userId);
     List<AuditLog> findByActionOrderByCreatedAtDesc(String action);
+    List<AuditLog> findAllByOrderByCreatedAtDesc();
 }

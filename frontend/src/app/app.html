@@ -1,19 +1,50 @@
 <div class="app-layout">
   <nav class="navbar">
     <div class="nav-brand">
-      <span class="bank-logo">🏛️ BANK COMPLIANCE</span>
-      <span class="nav-subtitle">AML Policy & Investigation Assistant</span>
+      <div class="bank-symbol">🏛️</div>
+      <div class="brand-text">
+        <span class="bank-title">AML POLICY GUARDIAN</span>
+        <span class="nav-subtitle">Tier-1 FIU Compliance Assistant</span>
+      </div>
     </div>
 
-    <div class="nav-links">
+    <div class="nav-center">
       @if (authService.isAuthenticated()) {
-        <a routerLink="/investigation" routerLinkActive="active-link">Investigation Assistant</a>
+        <!-- Links accessible to both ANALYST and ADMIN -->
+        <a routerLink="/chat" routerLinkActive="active-link" class="nav-item">
+          <span class="nav-icon">💬</span>
+          <span>Chat</span>
+        </a>
+        <a routerLink="/history" routerLinkActive="active-link" class="nav-item">
+          <span class="nav-icon">📜</span>
+          <span>History</span>
+        </a>
+
+        <!-- Links accessible only to ADMIN -->
+        @if (authService.isAdmin()) {
+          <a routerLink="/documents" routerLinkActive="active-link" class="nav-item">
+            <span class="nav-icon">📁</span>
+            <span>Documents</span>
+          </a>
+          <a routerLink="/admin/audit" routerLinkActive="active-link" class="nav-item">
+            <span class="nav-icon">🛡️</span>
+            <span>Audit</span>
+          </a>
+        }
+      }
+    </div>
+
+    <div class="nav-right">
+      @if (authService.isAuthenticated()) {
         <div class="user-pill">
-          <span>{{ authService.currentUser()?.fullName || authService.currentUser()?.username }}</span>
-          <button (click)="onLogout()" class="btn-logout">Sign Out</button>
+          <span class="user-name">{{ authService.currentUser()?.fullName || authService.currentUser()?.username }}</span>
+          <span class="role-badge" [class.role-admin]="authService.isAdmin()">
+            {{ authService.isAdmin() ? 'ADMIN' : 'ANALYST' }}
+          </span>
+          <button (click)="onLogout()" class="btn-logout" title="Sign Out">Sign Out</button>
         </div>
       } @else {
-        <a routerLink="/login" routerLinkActive="active-link">Sign In</a>
+        <a routerLink="/login" class="nav-item signin-link">Sign In</a>
       }
     </div>
   </nav>
