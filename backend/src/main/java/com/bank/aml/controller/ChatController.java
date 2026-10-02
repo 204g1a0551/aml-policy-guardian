@@ -75,6 +75,28 @@ public class ChatController {
         return ResponseEntity.ok(session);
     }
 
+    @GetMapping("/sessions/{id}/messages")
+    public ResponseEntity<List<ChatMessageResponse>> getSessionMessages(
+        @PathVariable UUID id,
+        @AuthenticationPrincipal SecurityUserPrincipal user,
+        java.security.Principal principal
+    ) {
+        SecurityUserPrincipal resolved = resolvePrincipal(user, principal);
+        List<ChatMessageResponse> messages = ragChatService.getSessionMessages(id, resolved);
+        return ResponseEntity.ok(messages);
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(
+        @PathVariable UUID id,
+        @AuthenticationPrincipal SecurityUserPrincipal user,
+        java.security.Principal principal
+    ) {
+        SecurityUserPrincipal resolved = resolvePrincipal(user, principal);
+        ragChatService.deleteSession(id, resolved);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/sessions/{id}/messages")
     public ResponseEntity<ChatMessageResponse> askQuestion(
         @PathVariable UUID id,

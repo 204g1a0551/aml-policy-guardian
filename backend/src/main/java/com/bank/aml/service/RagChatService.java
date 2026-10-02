@@ -80,13 +80,24 @@ public class RagChatService {
     @Transactional(readOnly = true)
     public ChatSessionResponse getSessionWithMessages(UUID sessionId, SecurityUserPrincipal user) {
         ChatSession session = authorizedRetrievalService.validateSessionAccess(sessionId, user);
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-
-        List<ChatMessageResponse> messageResponses = messages.stream()
-            .map(m -> new ChatMessageResponse(m.getId(), m.getRole(), m.getContent(), Collections.emptyList(), m.getCreatedAt()))
-            .toList();
-
+        List<ChatMessageResponse> messageResponses = getSessionMessages(sessionId, user);
         return new ChatSessionResponse(session.getId(), session.getUserId(), session.getTitle(), messageResponses, session.getCreatedAt(), session.getUpdatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatMessageResponse> getSessionMessages(UUID sessionId, SecurityUserPrincipal user) {
+        authorizedRetrievalService.validateSessionAccess(sessionId, user);
+        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        return messages.stream()
+            .map(m -> new ChatMessageResponse(m.getId(), m.getSessionId(), m.getRole(), m.getContent(), Collections.emptyList(), m.getCreatedAt()))
+            .toList();
+    }
+
+    @Transactional
+    public void deleteSession(UUID sessionId, SecurityUserPrincipal user) {
+        authorizedRetrievalService.validateSessionAccess(sessionId, user);
+        chatMessageRepository.deleteBySessionId(sessionId);
+        chatSessionRepository.deleteById(sessionId);
     }
 
     @Transactional

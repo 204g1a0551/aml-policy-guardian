@@ -148,7 +148,7 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                   <div class="citations-container">
                     <span class="citation-title">Grounded Compliance Citations:</span>
                     <div class="citation-badges">
-                      @for (cite of msg.citations; track cite.chunkId) {
+                      @for (cite of msg.citations; track ($index + '-' + cite.documentId)) {
                         <button 
                           type="button" 
                           class="citation-badge"
@@ -161,7 +161,7 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                           @if (cite.pageNumber) {
                             <span class="cite-page">p. {{ cite.pageNumber }}</span>
                           }
-                          <span class="cite-score">{{ (cite.similarityScore * 100) | number:'1.0-0' }}% Match</span>
+                          <span class="cite-score">{{ ((cite.similarityScore || cite.similarity || 0) * 100) | number:'1.0-0' }}% Match</span>
                         </button>
                       }
                     </div>
@@ -269,7 +269,7 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
               </div>
               <div class="detail-row">
                 <label>Similarity Score:</label>
-                <span class="score-pill">{{ ((selectedCitation()?.similarityScore || 0) * 100) | number:'1.1-1' }}% Cosine Alignment</span>
+                <span class="score-pill">{{ (((selectedCitation()?.similarityScore ?? selectedCitation()?.similarity) || 0) * 100) | number:'1.1-1' }}% Cosine Alignment</span>
               </div>
               <div class="detail-box">
                 <label>Verified Policy Excerpt:</label>

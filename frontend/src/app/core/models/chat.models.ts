@@ -1,12 +1,13 @@
 export interface Citation {
   documentId: string;
   documentTitle: string;
-  documentFilename: string;
-  chunkId: string;
+  documentFilename?: string;
+  chunkId?: string;
   pageNumber: number | null;
   section: string | null;
-  similarityScore: number;
-  chunkSnippet: string;
+  similarityScore?: number;
+  similarity?: number;
+  chunkSnippet?: string;
 }
 
 export interface ChatMessage {
