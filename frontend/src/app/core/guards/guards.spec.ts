@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { Router, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
 import { AuthService } from '../services/auth.service';
@@ -34,26 +34,24 @@ describe('Route Guards', () => {
 
     it('should redirect to /login when unauthenticated', () => {
       authService.logout();
-      const navigateSpy = vi.spyOn(router, 'navigate');
       const route = {} as ActivatedRouteSnapshot;
       const state = { url: '/chat' } as RouterStateSnapshot;
 
       const result = TestBed.runInInjectionContext(() => authGuard(route, state));
-      expect(result).toBe(false);
-      expect(navigateSpy).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/chat' } });
+      expect(result instanceof UrlTree).toBe(true);
+      expect((result as UrlTree).toString()).toContain('/login');
     });
   });
 
   describe('roleGuard', () => {
     it('should redirect to /login when user is not logged in', () => {
       authService.currentUser.set(null);
-      const navigateSpy = vi.spyOn(router, 'navigate');
       const route = { data: { expectedRoles: ['ROLE_ADMIN'] } } as unknown as ActivatedRouteSnapshot;
       const state = { url: '/documents' } as RouterStateSnapshot;
 
       const result = TestBed.runInInjectionContext(() => roleGuard(route, state));
-      expect(result).toBe(false);
-      expect(navigateSpy).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/documents' } });
+      expect(result instanceof UrlTree).toBe(true);
+      expect((result as UrlTree).toString()).toContain('/login');
     });
 
     it('should allow ADMIN to access /documents and /admin/audit', () => {
@@ -81,13 +79,12 @@ describe('Route Guards', () => {
         roles: ['ROLE_ANALYST']
       });
 
-      const navigateSpy = vi.spyOn(router, 'navigate');
       const route = { data: { expectedRoles: ['ROLE_ADMIN'] } } as unknown as ActivatedRouteSnapshot;
       const state = { url: '/admin/audit' } as RouterStateSnapshot;
 
       const result = TestBed.runInInjectionContext(() => roleGuard(route, state));
-      expect(result).toBe(false);
-      expect(navigateSpy).toHaveBeenCalledWith(['/chat']);
+      expect(result instanceof UrlTree).toBe(true);
+      expect((result as UrlTree).toString()).toBe('/chat');
     });
   });
 });

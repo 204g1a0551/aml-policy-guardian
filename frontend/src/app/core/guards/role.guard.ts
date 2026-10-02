@@ -1,8 +1,8 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const roleGuard: CanActivateFn = (route, state) => {
+export const roleGuard: CanActivateFn = (route, state): boolean | UrlTree => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
@@ -10,8 +10,7 @@ export const roleGuard: CanActivateFn = (route, state) => {
   const user = authService.currentUser();
 
   if (!user) {
-    router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
-    return false;
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
 
   if (!expectedRoles || expectedRoles.length === 0) {
@@ -23,7 +22,5 @@ export const roleGuard: CanActivateFn = (route, state) => {
     return true;
   }
 
-  // Not authorized -> redirect to chat
-  router.navigate(['/chat']);
-  return false;
+  return router.createUrlTree(['/chat']);
 };

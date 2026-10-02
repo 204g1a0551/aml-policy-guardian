@@ -8,7 +8,7 @@ import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'chat', pathMatch: 'full' },
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { 
     path: 'chat', 
@@ -33,5 +33,5 @@ export const routes: Routes = [
     data: { expectedRoles: ['ROLE_ADMIN'] }
   },
   { path: 'investigation', redirectTo: 'chat', pathMatch: 'full' },
-  { path: '**', redirectTo: 'chat' }
+  { path: '**', redirectTo: 'login' }
 ];
