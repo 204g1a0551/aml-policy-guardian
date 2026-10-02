@@ -66,6 +66,16 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
           </div>
           @if (currentSession()) {
             <div class="header-actions">
+              <button 
+                type="button" 
+                class="stream-toggle-btn" 
+                [class.streaming-on]="useStreaming()"
+                (click)="toggleStreaming()"
+                title="Toggle streaming SSE responses"
+              >
+                <span class="stream-dot"></span>
+                Streaming: {{ useStreaming() ? 'ON' : 'OFF' }}
+              </button>
               <span class="message-counter">{{ messages().length }} Messages</span>
             </div>
           }
@@ -118,7 +128,19 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                 </div>
 
                 <div class="bubble-content">
-                  {{ msg.content }}
+                  @if (!msg.content && isGeneratingResponse() && msg.role !== 'USER') {
+                    <div class="reasoning-indicator">
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="status-text">Grounded Compliance Reasoning in progress...</span>
+                    </div>
+                  } @else {
+                    {{ msg.content }}
+                    @if (isGeneratingResponse() && isStreaming() && msg.id === activeAssistantMsgId) {
+                      <span class="streaming-cursor">|</span>
+                    }
+                  }
                 </div>
 
                 <!-- Citations & Source Badges -->
@@ -149,7 +171,7 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
             </div>
           }
 
-          @if (isGeneratingResponse()) {
+          @if (isGeneratingResponse() && !isStreaming()) {
             <div class="message-row assistant-row">
               <div class="message-bubble assistant-bubble generating">
                 <div class="reasoning-indicator">
@@ -159,6 +181,13 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                   <span class="status-text">Grounded Compliance Reasoning in progress...</span>
                 </div>
               </div>
+            </div>
+          }
+
+          @if (streamingNotice()) {
+            <div class="chat-notice-banner">
+              <span>ℹ️ {{ streamingNotice() }}</span>
+              <button (click)="streamingNotice.set(null)" class="btn-dismiss">&times;</button>
             </div>
           }
 
@@ -185,17 +214,29 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
 
             <div class="input-controls">
               <span class="char-count">{{ currentQuery.length }} chars</span>
-              <button 
-                type="submit" 
-                class="btn-send" 
-                [disabled]="!currentQuery.trim() || isGeneratingResponse()"
-              >
+              <div class="input-buttons">
                 @if (isGeneratingResponse()) {
-                  <span class="spinner-sm"></span>
-                } @else {
-                  <span>Send</span>
+                  <button 
+                    type="button" 
+                    class="btn-stop" 
+                    (click)="cancelGeneration()"
+                    title="Stop generating response"
+                  >
+                    ⏹ Stop
+                  </button>
                 }
-              </button>
+                <button 
+                  type="submit" 
+                  class="btn-send" 
+                  [disabled]="!currentQuery.trim() || isGeneratingResponse()"
+                >
+                  @if (isGeneratingResponse()) {
+                    <span class="spinner-sm"></span>
+                  } @else {
+                    <span>Send</span>
+                  }
+                </button>
+              </div>
             </div>
           </form>
         </footer>
@@ -644,6 +685,91 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
       padding-top: 0.35rem;
       border-top: 1px solid #f1f5f9;
     }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .stream-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 20px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .stream-toggle-btn.streaming-on {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #065f46;
+    }
+    .stream-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+    .stream-toggle-btn.streaming-on .stream-dot {
+      background: #10b981;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+    .streaming-cursor {
+      display: inline-block;
+      color: #2563eb;
+      font-weight: bold;
+      animation: blink 0.8s infinite;
+      margin-left: 2px;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .input-buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-stop {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+      border-radius: 5px;
+      padding: 0.4rem 0.85rem;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background 0.15s;
+    }
+    .btn-stop:hover {
+      background: #fecaca;
+    }
+    .chat-notice-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     .char-count {
       font-size: 0.75rem;
       color: #94a3b8;
@@ -809,6 +935,13 @@ export class ChatComponent implements OnInit {
   isGeneratingResponse = signal(false);
   chatError = signal<string | null>(null);
 
+  useStreaming = signal(true);
+  isStreaming = signal(false);
+  streamingNotice = signal<string | null>(null);
+  activeAssistantMsgId: string | null = null;
+  private abortController: AbortController | null = null;
+  private streamTimeoutId: any = null;
+
   constructor(
     private chatService: ChatService,
     private route: ActivatedRoute,
@@ -817,6 +950,33 @@ export class ChatComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSessions();
+  }
+
+  toggleStreaming(): void {
+    this.useStreaming.update(v => !v);
+  }
+
+  cancelGeneration(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    if (this.streamTimeoutId) {
+      clearTimeout(this.streamTimeoutId);
+      this.streamTimeoutId = null;
+    }
+    if (this.activeAssistantMsgId) {
+      this.messages.update(msgs => msgs.map(m => {
+        if (m.id === this.activeAssistantMsgId) {
+          const content = m.content ? `${m.content} [Stopped by investigator]` : '[Generation stopped by investigator]';
+          return { ...m, content };
+        }
+        return m;
+      }));
+    }
+    this.isGeneratingResponse.set(false);
+    this.isStreaming.set(false);
+    this.activeAssistantMsgId = null;
   }
 
   loadSessions(): void {
@@ -873,6 +1033,7 @@ export class ChatComponent implements OnInit {
   selectSession(session: ChatSession): void {
     this.currentSession.set(session);
     this.chatError.set(null);
+    this.streamingNotice.set(null);
     this.isLoadingMessages.set(true);
     this.messages.set([]);
 
@@ -945,6 +1106,7 @@ export class ChatComponent implements OnInit {
   private executeSendMessage(sessionId: string, queryText: string): void {
     this.isGeneratingResponse.set(true);
     this.chatError.set(null);
+    this.streamingNotice.set(null);
 
     // Optimistically add user query to transcript
     const userMsg: ChatMessage = {
@@ -958,25 +1120,156 @@ export class ChatComponent implements OnInit {
     this.currentQuery = '';
     this.scrollToBottom();
 
+    if (!this.useStreaming()) {
+      this.executeSynchronous(sessionId, queryText);
+      return;
+    }
+
+    this.executeStreaming(sessionId, queryText);
+  }
+
+  private executeSynchronous(sessionId: string, queryText: string): void {
+    this.isStreaming.set(false);
     this.chatService.askQuestion(sessionId, { message: queryText, query: queryText }).subscribe({
       next: (responseMsg) => {
         this.isGeneratingResponse.set(false);
         this.messages.update(msgs => [...msgs, responseMsg]);
         this.scrollToBottom();
-
-        // Update session's updatedAt and message count locally
-        this.sessions.update(list => list.map(s => {
-          if (s.id === sessionId) {
-            return { ...s, updatedAt: new Date().toISOString(), messageCount: s.messageCount + 2 };
-          }
-          return s;
-        }));
+        this.updateSessionStats(sessionId);
       },
       error: (err) => {
         this.isGeneratingResponse.set(false);
-        this.chatError.set(err?.error?.detail || 'Failed to generate compliance response.');
+        this.chatError.set(err?.error?.detail || err?.message || 'Failed to generate compliance response.');
       }
     });
+  }
+
+  private async executeStreaming(sessionId: string, queryText: string): Promise<void> {
+    this.isStreaming.set(true);
+    const assistantMsgId = 'assistant-' + Date.now();
+    this.activeAssistantMsgId = assistantMsgId;
+
+    const placeholderAssistant: ChatMessage = {
+      id: assistantMsgId,
+      sessionId: sessionId,
+      role: 'ASSISTANT',
+      content: '',
+      createdAt: new Date().toISOString(),
+      citations: []
+    };
+    this.messages.update(msgs => [...msgs, placeholderAssistant]);
+    this.scrollToBottom();
+
+    this.abortController = new AbortController();
+    let tokensReceived = 0;
+
+    // Client-side 60s timeout handling
+    this.streamTimeoutId = setTimeout(() => {
+      if (this.isGeneratingResponse() && this.activeAssistantMsgId === assistantMsgId) {
+        this.abortController?.abort();
+        this.chatError.set('Response generation timed out after 60 seconds.');
+        this.cancelGeneration();
+      }
+    }, 60000);
+
+    try {
+      await this.chatService.streamQuestion(
+        sessionId,
+        queryText,
+        {
+          onStart: () => {
+            // Stream initiated
+          },
+          onCitations: (citations) => {
+            this.messages.update(msgs => msgs.map(m => {
+              if (m.id === assistantMsgId) {
+                return { ...m, citations };
+              }
+              return m;
+            }));
+            this.scrollToBottom();
+          },
+          onToken: (token) => {
+            tokensReceived++;
+            this.messages.update(msgs => msgs.map(m => {
+              if (m.id === assistantMsgId) {
+                return { ...m, content: m.content + token };
+              }
+              return m;
+            }));
+            this.scrollToBottom();
+          },
+          onComplete: (event) => {
+            if (this.streamTimeoutId) clearTimeout(this.streamTimeoutId);
+            this.isGeneratingResponse.set(false);
+            this.isStreaming.set(false);
+            this.abortController = null;
+            if (event.messageId) {
+              this.messages.update(msgs => msgs.map(m => {
+                if (m.id === assistantMsgId) {
+                  return { ...m, id: event.messageId! };
+                }
+                return m;
+              }));
+            }
+            this.activeAssistantMsgId = null;
+            this.updateSessionStats(sessionId);
+          },
+          onError: (err) => {
+            if (this.streamTimeoutId) clearTimeout(this.streamTimeoutId);
+            this.handleStreamingError(sessionId, queryText, assistantMsgId, tokensReceived, err);
+          }
+        },
+        this.abortController.signal
+      );
+    } catch (err: any) {
+      if (this.streamTimeoutId) clearTimeout(this.streamTimeoutId);
+      if (err.name !== 'AbortError') {
+        this.handleStreamingError(sessionId, queryText, assistantMsgId, tokensReceived, err);
+      }
+    }
+  }
+
+  private handleStreamingError(
+    sessionId: string,
+    queryText: string,
+    assistantMsgId: string,
+    tokensReceived: number,
+    err: any
+  ): void {
+    if (this.abortController === null && !this.isGeneratingResponse()) {
+      return;
+    }
+    this.abortController = null;
+
+    if (tokensReceived === 0) {
+      // No tokens received: gracefully fall back to synchronous endpoint
+      this.messages.update(msgs => msgs.filter(m => m.id !== assistantMsgId));
+      this.activeAssistantMsgId = null;
+      this.streamingNotice.set('Streaming connection unavailable. Automatically falling back to synchronous compliance engine...');
+      this.executeSynchronous(sessionId, queryText);
+    } else {
+      // Partial tokens received: preserve tokens and mark interrupted
+      this.isGeneratingResponse.set(false);
+      this.isStreaming.set(false);
+      this.activeAssistantMsgId = null;
+      this.messages.update(msgs => msgs.map(m => {
+        if (m.id === assistantMsgId) {
+          return { ...m, content: m.content + ' [Stream interrupted: ' + (err.message || 'connection lost') + ']' };
+        }
+        return m;
+      }));
+      this.chatError.set('Streaming connection lost: ' + (err.message || 'unknown error'));
+    }
+  }
+
+  private updateSessionStats(sessionId: string): void {
+    this.sessions.update(list => list.map(s => {
+      if (s.id === sessionId) {
+        return { ...s, updatedAt: new Date().toISOString(), messageCount: (s.messageCount || 0) + 2 };
+      }
+      return s;
+    }));
   }
 
   onKeyDown(event: KeyboardEvent): void {

@@ -12,6 +12,10 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.time.Duration;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +51,44 @@ public class LlmGenerationService {
         }
 
         return executeDeterministicReasoning(assembledPrompt);
+    }
+
+    public Flux<String> streamAnswer(AssembledPrompt assembledPrompt) {
+        if (chatModel != null && !fallbackModeActive) {
+            try {
+                Message systemMsg = new SystemPromptTemplate(assembledPrompt.systemInstruction()).createMessage();
+                Message userMsg = new UserMessage(assembledPrompt.fullUserPrompt());
+                Prompt prompt = new Prompt(List.of(systemMsg, userMsg));
+
+                return chatModel.stream(prompt)
+                    .map(chatResponse -> {
+                        if (chatResponse != null && chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
+                            String token = chatResponse.getResult().getOutput().getContent();
+                            return token != null ? token : "";
+                        }
+                        return "";
+                    })
+                    .filter(token -> !token.isEmpty())
+                    .onErrorResume(e -> {
+                        fallbackModeActive = true;
+                        log.warn("Remote ChatModel streaming error ({}); falling back to deterministic compliance stream.", e.getMessage());
+                        return streamDeterministicReasoning(assembledPrompt);
+                    });
+            } catch (Exception e) {
+                fallbackModeActive = true;
+                log.warn("Remote ChatModel offline or unavailable ({}); switching to deterministic compliance stream.", e.getMessage());
+            }
+        }
+
+        return streamDeterministicReasoning(assembledPrompt);
+    }
+
+    private Flux<String> streamDeterministicReasoning(AssembledPrompt prompt) {
+        String answer = executeDeterministicReasoning(prompt);
+        // Tokenize by whitespace while preserving punctuation
+        String[] tokens = answer.split("(?<=\\s+)|(?=\\s+)");
+        return Flux.fromArray(tokens)
+            .concatMap(token -> Mono.just(token).delayElement(Duration.ofMillis(15)));
     }
 
     public void resetFallbackMode() {

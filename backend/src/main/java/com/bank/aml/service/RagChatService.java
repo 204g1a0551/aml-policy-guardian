@@ -4,6 +4,7 @@ import com.bank.aml.dto.request.AskQuestionRequest;
 import com.bank.aml.dto.request.CreateChatSessionRequest;
 import com.bank.aml.dto.response.ChatMessageResponse;
 import com.bank.aml.dto.response.ChatSessionResponse;
+import com.bank.aml.dto.response.ChatStreamEvent;
 import com.bank.aml.dto.response.CitationResponse;
 import com.bank.aml.entity.ChatMessage;
 import com.bank.aml.entity.ChatSession;
@@ -17,7 +18,10 @@ import com.bank.aml.security.SecurityUserPrincipal;
 import com.bank.aml.security.rag.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -227,5 +231,165 @@ public class RagChatService {
         }
 
         return citations;
+    }
+
+    public Flux<ChatStreamEvent> streamQuestion(UUID sessionId, String rawQuery, SecurityUserPrincipal user, String correlationId) {
+        // 1. Authorize session ownership
+        ChatSession session = authorizedRetrievalService.validateSessionAccess(sessionId, user);
+        String userQuery = rawQuery.trim();
+
+        // 2. Input Validation & Guardrail Scan
+        RagSecurityGuardrails.ScanResult scanResult = guardrails.scanUserQuery(userQuery);
+
+        if (!scanResult.safe()) {
+            securityAuditService.recordSecurityEvent(
+                user.getId(),
+                "PROMPT_INJECTION_BLOCKED",
+                "CHAT_SESSION",
+                sessionId.toString(),
+                correlationId,
+                Map.of(
+                    "attackType", scanResult.attackType(),
+                    "reason", scanResult.reason(),
+                    "riskScore", scanResult.riskScore(),
+                    "rawQuery", userQuery
+                )
+            );
+
+            // Persist user and refusal messages
+            ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
+            chatMessageRepository.save(userMsg);
+
+            String refusal = "I am an authorized AML Compliance Assistant. I can only provide guidance grounded in approved bank compliance policies. I cannot execute instructions that waive statutory AML requirements, override reporting thresholds, or disclose internal system parameters.";
+            ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", refusal);
+            ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
+
+            return Flux.just(
+                ChatStreamEvent.start(correlationId, sessionId),
+                ChatStreamEvent.token(correlationId, sessionId, refusal),
+                ChatStreamEvent.complete(correlationId, sessionId, savedAssistantMsg.getId())
+            );
+        }
+
+        // 3. Authorized Vector Retrieval
+        List<ChunkSimilarityProjection> retrievedChunks = authorizedRetrievalService.retrieveAuthorizedContext(scanResult.sanitizedInput(), user);
+
+        // 4. Scan retrieved chunks for indirect prompt injection
+        for (ChunkSimilarityProjection chunk : retrievedChunks) {
+            if (guardrails.containsIndirectInjection(chunk.getChunkText())) {
+                securityAuditService.recordSecurityEvent(
+                    user.getId(),
+                    "MALICIOUS_DOCUMENT_INJECTION_FLAGGED",
+                    "DOCUMENT_CHUNK",
+                    chunk.getId().toString(),
+                    correlationId,
+                    Map.of(
+                        "documentId", chunk.getDocumentId().toString(),
+                        "section", chunk.getSection() != null ? chunk.getSection() : "unknown",
+                        "detectedText", chunk.getChunkText().substring(0, Math.min(100, chunk.getChunkText().length()))
+                    )
+                );
+            }
+        }
+
+        // 5. Build citations
+        List<CitationResponse> citations = buildCitations(retrievedChunks);
+
+        // 6. Persist User Message immediately so inquiry is recorded even if stream is interrupted
+        ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
+        chatMessageRepository.save(userMsg);
+
+        // Audit stream started
+        securityAuditService.recordSecurityEvent(
+            user.getId(),
+            "RAG_STREAM_STARTED",
+            "CHAT_SESSION",
+            sessionId.toString(),
+            correlationId,
+            Map.of("retrievedChunksCount", retrievedChunks.size(), "citationsCount", citations.size())
+        );
+
+        // 7. Instruction Hierarchy Prompt Construction
+        InstructionHierarchyPromptBuilder.AssembledPrompt assembledPrompt = promptBuilder.buildSecurePrompt(
+            scanResult.sanitizedInput(),
+            retrievedChunks
+        );
+
+        // 8. Stream execution with token accumulation, timeout, cancellation & completion handling
+        StringBuilder accumulated = new StringBuilder();
+
+        Flux<ChatStreamEvent> tokenEvents = llmGenerationService.streamAnswer(assembledPrompt)
+            .timeout(Duration.ofSeconds(60))
+            .map(token -> {
+                accumulated.append(token);
+                return ChatStreamEvent.token(correlationId, sessionId, token);
+            })
+            .doOnCancel(() -> {
+                securityAuditService.recordSecurityEvent(
+                    user.getId(),
+                    "RAG_STREAM_CANCELLED",
+                    "CHAT_SESSION",
+                    sessionId.toString(),
+                    correlationId,
+                    Map.of("partialLength", accumulated.length())
+                );
+                if (accumulated.length() > 0) {
+                    ChatMessage partialMsg = new ChatMessage(sessionId, "ASSISTANT", accumulated.toString() + " [Stream cancelled by user]");
+                    chatMessageRepository.save(partialMsg);
+                }
+            })
+            .onErrorResume(e -> {
+                securityAuditService.recordSecurityEvent(
+                    user.getId(),
+                    "RAG_STREAM_FAILED",
+                    "CHAT_SESSION",
+                    sessionId.toString(),
+                    correlationId,
+                    Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown stream error")
+                );
+                return Flux.just(ChatStreamEvent.error(correlationId, sessionId, "Streaming response encountered an error: " + e.getMessage()));
+            });
+
+        // Combine: START event -> CITATIONS event -> TOKEN events -> COMPLETE event
+        Flux<ChatStreamEvent> startEvents = Flux.just(
+            ChatStreamEvent.start(correlationId, sessionId),
+            ChatStreamEvent.citations(correlationId, sessionId, citations)
+        );
+
+        Mono<ChatStreamEvent> completionEvent = Mono.defer(() -> {
+            String rawGeneratedAnswer = accumulated.toString();
+            RagOutputValidator.OutputValidationResult outputValidation = outputValidator.validateOutput(rawGeneratedAnswer);
+            String finalAnswer = outputValidation.validatedContent();
+
+            if (!outputValidation.valid()) {
+                securityAuditService.recordSecurityEvent(
+                    user.getId(),
+                    "OUTPUT_VALIDATION_VIOLATION",
+                    "CHAT_SESSION",
+                    sessionId.toString(),
+                    correlationId,
+                    Map.of(
+                        "violationType", outputValidation.violationType(),
+                        "violationDetail", outputValidation.violationDetail()
+                    )
+                );
+            }
+
+            ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", finalAnswer);
+            ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
+
+            securityAuditService.recordSecurityEvent(
+                user.getId(),
+                "RAG_STREAM_COMPLETED",
+                "CHAT_SESSION",
+                sessionId.toString(),
+                correlationId,
+                Map.of("finalLength", finalAnswer.length())
+            );
+
+            return Mono.just(ChatStreamEvent.complete(correlationId, sessionId, savedAssistantMsg.getId()));
+        });
+
+        return startEvents.concatWith(tokenEvents).concatWith(completionEvent);
     }
 }

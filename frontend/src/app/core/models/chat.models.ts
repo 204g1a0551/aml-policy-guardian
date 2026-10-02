@@ -34,3 +34,14 @@ export interface AskQuestionRequest {
   message: string;
   query?: string;
 }
+
+export interface ChatStreamEvent {
+  type: 'START' | 'CITATIONS' | 'TOKEN' | 'COMPLETE' | 'ERROR';
+  correlationId?: string;
+  sessionId?: string;
+  messageId?: string;
+  token?: string;
+  citations?: Citation[];
+  error?: string;
+  timestamp?: string;
+}
