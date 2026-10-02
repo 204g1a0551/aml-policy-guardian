@@ -4,19 +4,20 @@ services:
     container_name: aml-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: aml_assistant
+      POSTGRES_DB: ${POSTGRES_DB:-aml_assistant}
       POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
     ports:
       - "${DATABASE_HOST_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro
+      - ./infra/init-pgvector.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-postgres} -d aml_assistant"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-postgres} -d ${POSTGRES_DB:-aml_assistant}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   backend:
     build:
@@ -25,18 +26,30 @@ services:
     container_name: aml-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - docstorage:/app/storage
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/aml_assistant
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aml_assistant}
       DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       LLM_API_KEY: ${LLM_API_KEY:-mock-key}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-mock-key}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
       JWT_SECRET: ${JWT_SECRET:-4c8b21e8e561a37c02b9e6584dc74c207b822d56a282f1b402179836371ad5f3e9c704a43b2f515e1bc09a656711c1e550b06b9b3e02}
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
 
   frontend:
     build:
@@ -45,9 +58,19 @@ services:
     container_name: aml-frontend
     restart: unless-stopped
     ports:
-      - "4200:80"
+      - "${FRONTEND_PORT:-4200}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   pgdata:
+    name: aml_pgdata
+  docstorage:
+    name: aml_docstorage

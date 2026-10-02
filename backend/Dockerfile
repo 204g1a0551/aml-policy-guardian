@@ -7,21 +7,27 @@ COPY .mvn .mvn
 COPY mvnw .
 RUN chmod +x mvnw
 
-# Pre-fetch dependencies
-RUN ./mvnw dependency:go-offline -B || true
-
 COPY src ./src
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -DskipTests -B
 
-# Stage 2: Runtime image
+# Stage 2: Minimal, hardened production runtime
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-RUN addgroup -S spring && adduser -S spring -G spring
+# Install curl for health check and create unprivileged application user with storage permissions
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    mkdir -p /app/storage/documents && \
+    chown -R spring:spring /app
+
 USER spring:spring
 
-COPY --from=builder /app/target/*.jar app.jar
+# Copy compiled artifact from builder stage
+COPY --from=builder --chown=spring:spring /app/target/aml-assistant-backend-*.jar app.jar
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=25s --retries=5 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

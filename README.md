@@ -101,12 +101,38 @@ flowchart TD
 
 ## Running the Application
 
-### Prerequisites
-- Java 21+
-- Node.js 20+ & npm
+### 1. Docker Compose (Production-like Stack)
+
+The complete stack (PostgreSQL + pgvector, Spring Boot backend, Angular frontend via Nginx) is containerized with multi-stage builds, non-root users, health checks, and persistent volumes:
+
+```bash
+# 1. Configure environment variables (copy template)
+cp .env.example .env
+
+# 2. Build and launch all services
+docker compose up --build -d
+
+# 3. Inspect container health
+docker compose ps
+
+# 4. View real-time logs
+docker compose logs -f
+```
+
+* **Frontend:** Accessible at `http://localhost:4200`
+* **Backend API & Swagger:** Accessible at `http://localhost:8080/api/v1`
+* **Health Check Probes:**
+  * Frontend: `http://localhost:4200/health`
+  * Backend: `http://localhost:8080/actuator/health`
+
+### 2. Local Development Setup
+
+#### Prerequisites
+- Java 21+ & Maven 3.9+
+- Node.js 22+ & npm
 - Docker Desktop with PostgreSQL 16 & pgvector
 
-### 1. Database Setup
+#### 1. Database Setup
 ```bash
 docker run -d \
   --name aml-postgres \
@@ -117,27 +143,77 @@ docker run -d \
   pgvector/pgvector:pg16
 ```
 
-### 2. Backend Setup
+#### 2. Backend Setup
 ```bash
 cd backend
 export $(cat ../.env | grep -v '^#' | xargs)
-./mvnw clean test          # Runs all 119 backend tests
+./mvnw clean test          # Runs all unit & integration tests
 ./mvnw spring-boot:run     # Starts server on http://localhost:8080
 ```
 
-### 3. Frontend Setup
+#### 3. Frontend Setup
 ```bash
 cd frontend
 npm install
-npm test -- --watch=false  # Runs all 15 Angular test specs
+npm test -- --watch=false  # Runs Angular component specs
 npm start                  # Starts dev server on http://localhost:4200
 ```
 
 ---
 
-## Default Credentials
+## CI/CD Pipeline (GitHub Actions)
+
+The application employs automated continuous integration and continuous delivery workflows designed for zero secret leakage, artifact caching, and gatekeeping:
+
+```mermaid
+flowchart LR
+    PR["Pull Request / Push"] --> CI_BE["Backend Build & Unit Tests\n(Maven Cache + JDK 21)"]
+    PR --> CI_FE["Frontend Build & Tests\n(npm Cache + Node 22)"]
+    CI_BE --> CI_IT["Integration Tests\n(pgvector Container)"]
+    CI_FE --> CI_SEC["Security & Secret Scan\n(TruffleHog + npm audit)"]
+    CI_IT --> CI_DOCKER["Multi-Stage Docker Build\n(Backend + Frontend)"]
+    CI_SEC --> CI_DOCKER
+    CI_DOCKER --> CD_DEPLOY["AWS Deployment\n(ECR + SSM Dispatch)"]
+    CD_DEPLOY --> CD_HEALTH["Post-Deploy Health Check\n(/health Probe)"]
+    CD_HEALTH -->|Pass| CD_DONE["Production Ready"]
+    CD_HEALTH -->|Fail| CD_ROLLBACK["Automated Rollback\n(Previous Tag)"]
+```
+
+### Workflows
+
+| Workflow | Path | Trigger | Responsibilities |
+| :--- | :--- | :--- | :--- |
+| **CI Pipeline** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Pull Request, Push to `main`/`develop` | Compiles Java & TypeScript, executes backend unit/integration tests with live pgvector, scans for secrets via TruffleHog, audits npm dependencies, and validates Docker image builds. Test failures strictly block the pipeline. |
+| **CD Pipeline** | [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) | Completion of CI on `main` (or manual dispatch) | Authenticates with AWS via OIDC/Secrets, builds and pushes images to Amazon ECR, dispatches zero-downtime container rollout on EC2 via AWS Systems Manager (SSM), executes post-deployment health check probes, and triggers automated rollback on failure. |
+
+### Required GitHub Secrets
+
+Configure the following secrets under **Settings > Secrets and variables > Actions**:
+
+* `AWS_ACCESS_KEY_ID`: IAM deployment user access key ID.
+* `AWS_SECRET_ACCESS_KEY`: IAM deployment user secret access key.
+* `AWS_REGION`: Target deployment region (e.g., `us-east-1`).
+* `AWS_EC2_INSTANCE_ID`: Target EC2 instance ID for SSM deployment commands.
+* `PRODUCTION_APP_URL`: Public endpoint for post-deployment health checking (e.g., `https://aml-guardian.yourbank.com`).
+* `JWT_SECRET`: Production 256-bit+ HMAC signing secret.
+* `LLM_API_KEY`: API key for Gemini / OpenAI inference.
+
+---
+
+## AWS Cloud Architecture & Runbooks
+
+Comprehensive production documentation is maintained in [`docs/`](docs/):
+
+* [**AWS Architecture & Network Design**](docs/aws-architecture.md): VPC topology, subnets, S3 Gateway endpoint ($0 NAT alternative), RDS PostgreSQL + pgvector sizing, and cost optimization (~$27/month).
+* [**AWS Security & Hardening Guide**](docs/aws-security.md): Least-privilege IAM policies, security group matrices, private RDS isolation, S3 TLS enforcement, KMS encryption, and audit log centralization.
+* [**AWS Deployment & Operations Runbook**](docs/aws-deployment.md): Step-by-step CLI commands for provisioning, Zero-Downtime deployment via SSM, automated verification, rollback steps, and zero-waste resource cleanup.
+
+---
+
+## Default Credentials (Local / Sandbox)
 
 | Username | Password | Roles | Available Pages |
 | :--- | :--- | :--- | :--- |
-| `analyst` | `AdminPass123!` | `ROLE_ANALYST` | `/chat`, `/history` |
-| `admin` | `AdminPass123!` | `ROLE_ADMIN`, `ROLE_ANALYST` | `/chat`, `/history`, `/documents`, `/admin/audit` |
+| `analyst` | `password123` | `ROLE_ANALYST` | `/chat`, `/history` |
+| `admin` | `admin123` | `ROLE_ADMIN`, `ROLE_ANALYST` | `/chat`, `/history`, `/documents`, `/admin/audit` |
+

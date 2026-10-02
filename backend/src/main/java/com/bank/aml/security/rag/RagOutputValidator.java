@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
@@ -26,6 +27,13 @@ public class RagOutputValidator {
         Pattern.compile("\\$2[aby]\\$\\d{2}\\$[A-Za-z0-9./]{53}") // BCrypt hash
     );
 
+    // PII Detection Patterns (GLBA / PCI-DSS compliance)
+    private static final Pattern SSN_PATTERN =
+        Pattern.compile("\\b(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}\\b");
+
+    private static final Pattern CREDIT_CARD_PATTERN =
+        Pattern.compile("\\b(?:4[0-9]{3}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|5[1-5][0-9]{2}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|3[47][0-9]{2}[- ]?[0-9]{6}[- ]?[0-9]{5}|6(?:011|5[0-9]{2})[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4})\\b");
+
     private static final List<Pattern> SYSTEM_LEAK_PATTERNS = List.of(
         Pattern.compile("<system_instructions>", Pattern.CASE_INSENSITIVE),
         Pattern.compile("CONSTITUTIONAL DIRECTIVES AND INSTRUCTION HIERARCHY", Pattern.CASE_INSENSITIVE),
@@ -42,7 +50,7 @@ public class RagOutputValidator {
         "I am an authorized AML Compliance Assistant. I can only provide guidance grounded in approved bank compliance policies. I cannot execute instructions that waive statutory AML requirements, override reporting thresholds, or disclose internal system parameters.";
 
     /**
-     * Inspects generated LLM output for confidential data leakage or policy compromise before returning to the user.
+     * Inspects generated LLM output for confidential data leakage, PII, or policy compromise before returning to the user.
      */
     public OutputValidationResult validateOutput(String generatedOutput) {
         if (generatedOutput == null || generatedOutput.isBlank()) {
@@ -88,6 +96,17 @@ public class RagOutputValidator {
             }
         }
 
-        return new OutputValidationResult(true, generatedOutput, null, null);
+        // 4. Scrub and mask PII (SSN and Credit Card numbers) to preserve financial privacy
+        String sanitizedOutput = maskPii(generatedOutput);
+
+        return new OutputValidationResult(true, sanitizedOutput, null, null);
+    }
+
+    private String maskPii(String input) {
+        Matcher ssnMatcher = SSN_PATTERN.matcher(input);
+        String masked = ssnMatcher.replaceAll("[REDACTED-SSN]");
+
+        Matcher cardMatcher = CREDIT_CARD_PATTERN.matcher(masked);
+        return cardMatcher.replaceAll("[REDACTED-CARD-PAN]");
     }
 }

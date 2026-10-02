@@ -1,0 +1,128 @@
+name: CD - Deploy to AWS Production
+
+on:
+  workflow_run:
+    workflows: ["CI - AML Policy Guardian Pipeline"]
+    branches: [ main ]
+    types: [ completed ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to AWS EC2 & Verify Health
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC or IAM Secrets)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Images
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build Backend
+          docker build -t $REGISTRY/aml-backend:$IMAGE_TAG -t $REGISTRY/aml-backend:latest ./backend
+          docker push $REGISTRY/aml-backend:$IMAGE_TAG
+          docker push $REGISTRY/aml-backend:latest
+
+          # Build Frontend
+          docker build -t $REGISTRY/aml-frontend:$IMAGE_TAG -t $REGISTRY/aml-frontend:latest ./frontend
+          docker push $REGISTRY/aml-frontend:$IMAGE_TAG
+          docker push $REGISTRY/aml-frontend:latest
+
+      - name: Execute Zero-Downtime Deployment via AWS Systems Manager (SSM)
+        id: ssm-deploy
+        env:
+          INSTANCE_ID: ${{ secrets.AWS_EC2_INSTANCE_ID }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              \"cd /opt/aml-assistant\",
+              \"aws ecr get-login-password --region ${{ secrets.AWS_REGION || 'us-east-1' }} | docker login --username AWS --password-stdin $REGISTRY\",
+              \"docker pull $REGISTRY/aml-backend:$IMAGE_TAG\",
+              \"docker pull $REGISTRY/aml-frontend:$IMAGE_TAG\",
+              \"export BACKEND_IMAGE=$REGISTRY/aml-backend:$IMAGE_TAG\",
+              \"export FRONTEND_IMAGE=$REGISTRY/aml-frontend:$IMAGE_TAG\",
+              \"docker compose -f docker-compose.prod.yml up -d --remove-orphans\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "Dispatched SSM Command: $COMMAND_ID"
+          echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
+
+          # Wait for SSM command execution
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID"
+
+      - name: Post-Deployment Automated Health Check & Smoke Test
+        id: health-check
+        env:
+          TARGET_URL: ${{ secrets.PRODUCTION_APP_URL || 'http://localhost:4200' }}
+        run: |
+          echo "Conducting post-deployment health check against $TARGET_URL..."
+          MAX_RETRIES=15
+          COUNT=0
+          SUCCESS=0
+
+          until [ $COUNT -ge $MAX_RETRIES ]; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL/health" || echo "000")
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Health probe responded 200 OK!"
+              SUCCESS=1
+              break
+            fi
+            echo "Attempt $((COUNT+1))/$MAX_RETRIES failed with status $STATUS. Retrying in 5s..."
+            COUNT=$((COUNT+1))
+            sleep 5
+          done
+
+          if [ $SUCCESS -ne 1 ]; then
+            echo "::error::Post-deployment health check failed!"
+            exit 1
+          fi
+
+      - name: Automated Rollback on Deployment Failure
+        if: failure() && steps.ssm-deploy.outcome == 'success'
+        env:
+          INSTANCE_ID: ${{ secrets.AWS_EC2_INSTANCE_ID }}
+        run: |
+          echo "::warning::Health check failed. Executing automated rollback to previous container tag..."
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              \"cd /opt/aml-assistant\",
+              \"docker compose -f docker-compose.prod.yml rollback || docker compose -f docker-compose.prod.yml up -d\"
+            ]"

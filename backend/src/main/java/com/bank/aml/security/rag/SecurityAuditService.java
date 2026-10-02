@@ -37,9 +37,24 @@ public class SecurityAuditService {
             String metadataJson = objectMapper.writeValueAsString(details);
             AuditLog auditLog = new AuditLog(userId, action, resourceType, resourceId, requestId, metadataJson);
             auditLogRepository.save(auditLog);
-            log.warn("COMPLIANCE AUDIT EVENT [{}]: user={}, resource={}:{}, details={}", action, userId, resourceType, resourceId, metadataJson);
+
+            // Sanitize all logged strings against CRLF log injection attacks
+            String safeAction = sanitizeForLog(action);
+            String safeResourceType = sanitizeForLog(resourceType);
+            String safeResourceId = sanitizeForLog(resourceId);
+            String safeMetadata = sanitizeForLog(metadataJson);
+
+            log.warn("COMPLIANCE AUDIT EVENT [{}]: user={}, resource={}:{}, details={}",
+                safeAction, userId, safeResourceType, safeResourceId, safeMetadata);
         } catch (Exception e) {
             log.error("Failed to persist security audit event: {}", e.getMessage(), e);
         }
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replace('\r', '_').replace('\n', '_');
     }
 }
