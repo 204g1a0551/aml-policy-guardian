@@ -29,15 +29,17 @@ spring:
 
   ai:
     openai:
+      base-url: ${LLM_BASE_URL:https://api.openai.com}
       api-key: ${LLM_API_KEY:mock-key}
       chat:
         options:
-          model: gpt-4o-mini
+          model: ${LLM_MODEL:gpt-4o-mini}
           temperature: 0.0
       embedding:
-        api-key: ${EMBEDDING_API_KEY:mock-key}
+        base-url: ${EMBEDDING_BASE_URL:${LLM_BASE_URL:https://api.openai.com}}
+        api-key: ${EMBEDDING_API_KEY:${LLM_API_KEY:mock-key}}
         options:
-          model: text-embedding-ada-002
+          model: ${EMBEDDING_MODEL:text-embedding-ada-002}
     vectorstore:
       pgvector:
         initialize-schema: false
