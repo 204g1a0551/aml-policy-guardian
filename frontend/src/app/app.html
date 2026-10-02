@@ -1,54 +1,69 @@
 <div class="app-layout">
-  <nav class="navbar">
-    <div class="nav-brand">
-      <div class="bank-symbol">🏛️</div>
+  <!-- Institutional Top Header -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand-crest">
+        <svg class="crest-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      </div>
       <div class="brand-text">
-        <span class="bank-title">AML POLICY GUARDIAN</span>
+        <div class="brand-row">
+          <span class="bank-title">AML POLICY GUARDIAN</span>
+          <span class="env-pill">FIU SECURE</span>
+        </div>
         <span class="nav-subtitle">Tier-1 FIU Compliance Assistant</span>
       </div>
     </div>
 
-    <div class="nav-center">
+    <!-- Institutional Navigation Links -->
+    <nav class="nav-center" aria-label="Main Navigation">
       @if (authService.isAuthenticated()) {
-        <!-- Links accessible to both ANALYST and ADMIN -->
+        <a routerLink="/overview" routerLinkActive="active-link" class="nav-item">
+          <span>Overview</span>
+        </a>
         <a routerLink="/chat" routerLinkActive="active-link" class="nav-item">
-          <span class="nav-icon">💬</span>
-          <span>Chat</span>
+          <span>Investigation (Chat)</span>
         </a>
         <a routerLink="/history" routerLinkActive="active-link" class="nav-item">
-          <span class="nav-icon">📜</span>
-          <span>History</span>
+          <span>Investigation History</span>
         </a>
 
-        <!-- Links accessible only to ADMIN -->
         @if (authService.isAdmin()) {
           <a routerLink="/documents" routerLinkActive="active-link" class="nav-item">
-            <span class="nav-icon">📁</span>
-            <span>Documents</span>
+            <span>Policy Documents</span>
           </a>
           <a routerLink="/admin/audit" routerLinkActive="active-link" class="nav-item">
-            <span class="nav-icon">🛡️</span>
-            <span>Audit</span>
+            <span>Compliance Audit</span>
           </a>
         }
-      }
-    </div>
 
+        <a routerLink="/settings" routerLinkActive="active-link" class="nav-item">
+          <span>Settings</span>
+        </a>
+      }
+    </nav>
+
+    <!-- User Authentication & Profile Pill -->
     <div class="nav-right">
       @if (authService.isAuthenticated()) {
         <div class="user-pill">
-          <span class="user-name">{{ authService.currentUser()?.fullName || authService.currentUser()?.username }}</span>
-          <span class="role-badge" [class.role-admin]="authService.isAdmin()">
-            {{ authService.isAdmin() ? 'ADMIN' : 'ANALYST' }}
-          </span>
-          <button (click)="onLogout()" class="btn-logout" title="Sign Out">Sign Out</button>
+          <div class="user-meta">
+            <span class="user-name">{{ authService.currentUser()?.fullName || authService.currentUser()?.username }}</span>
+            <span class="role-badge" [class.role-admin]="authService.isAdmin()">
+              {{ authService.isAdmin() ? 'ADMIN' : 'ANALYST' }}
+            </span>
+          </div>
+          <button (click)="onLogout()" class="btn-logout" title="Sign out of compliance portal">Sign Out</button>
         </div>
       } @else {
         <a routerLink="/login" class="nav-item signin-link">Sign In</a>
       }
     </div>
-  </nav>
+  </header>
 
+  <!-- Main Institutional Workspace -->
   <main class="main-content">
     <router-outlet></router-outlet>
   </main>

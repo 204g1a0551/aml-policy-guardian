@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, effect, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, signal, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,43 +10,61 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="chat-container">
-      <!-- Sidebar / Conversation List -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <button class="btn-new-chat" (click)="createNewSession()" [disabled]="isCreatingSession()">
-            <span>+ New Investigation</span>
+    <div class="workbench-layout">
+      <!-- Left Panel: Investigation Case Sessions -->
+      <aside class="case-sidebar">
+        <div class="sidebar-top">
+          <div class="sidebar-title-row">
+            <span class="sidebar-heading">Investigation Cases</span>
+            <span class="session-count-badge">{{ sessions().length }}</span>
+          </div>
+          <button 
+            type="button" 
+            class="btn-new-case" 
+            (click)="createNewSession()" 
+            [disabled]="isCreatingSession()"
+          >
+            <span>+ New Inquiry</span>
           </button>
         </div>
 
-        <div class="session-search">
+        <div class="search-filter-box">
           <input 
             type="text" 
-            placeholder="Search sessions..." 
+            placeholder="Filter investigations..." 
             [(ngModel)]="searchQuery"
+            class="filter-input"
           />
         </div>
 
-        <div class="session-list">
+        <div class="cases-list" role="list">
           @if (filteredSessions().length === 0) {
-            <div class="empty-sessions">
-              <p>No investigations found.</p>
+            <div class="no-cases">
+              <span>No investigations found.</span>
             </div>
           } @else {
             @for (session of filteredSessions(); track session.id) {
               <div 
-                class="session-item" 
+                class="case-item" 
                 [class.active]="currentSession()?.id === session.id"
                 (click)="selectSession(session)"
+                role="listitem"
+                tabindex="0"
+                (keydown.enter)="selectSession(session)"
               >
-                <div class="session-info">
-                  <span class="session-title">{{ session.title }}</span>
-                  <span class="session-date">{{ session.updatedAt | date:'shortDate' }}</span>
+                <div class="case-info">
+                  <span class="case-title">{{ session.title }}</span>
+                  <div class="case-meta">
+                    <span class="case-date">{{ session.updatedAt | date:'shortDate' }}</span>
+                    <span class="case-msg-count">{{ session.messageCount || 0 }} queries</span>
+                  </div>
                 </div>
                 <button 
-                  class="btn-delete-session" 
-                  title="Delete Session" 
+                  type="button" 
+                  class="btn-close-case" 
+                  title="Delete case session" 
                   (click)="deleteSession(session.id, $event)"
+                  aria-label="Delete session"
                 >
                   &times;
                 </button>
@@ -56,50 +74,68 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
         </div>
       </aside>
 
-      <!-- Main Chat Area -->
-      <section class="chat-main">
-        <!-- Chat Header -->
-        <header class="chat-header">
-          <div class="header-info">
-            <h2>{{ currentSession()?.title || 'AML Policy Investigation' }}</h2>
-            <span class="header-badge">Grounded RAG &bull; Tier-1 Banking Compliance</span>
-          </div>
-          @if (currentSession()) {
-            <div class="header-actions">
-              <button 
-                type="button" 
-                class="stream-toggle-btn" 
-                [class.streaming-on]="useStreaming()"
-                (click)="toggleStreaming()"
-                title="Toggle streaming SSE responses"
-              >
-                <span class="stream-dot"></span>
-                Streaming: {{ useStreaming() ? 'ON' : 'OFF' }}
-              </button>
-              <span class="message-counter">{{ messages().length }} Messages</span>
+      <!-- Main Workspace: Policy Research & Guidance -->
+      <main class="workbench-main">
+        <!-- Top Case Toolbar -->
+        <div class="case-toolbar">
+          <div class="toolbar-left">
+            <h2 class="active-case-title">{{ currentSession()?.title || 'Policy Investigation Workspace' }}</h2>
+            <div class="case-tags">
+              <span class="pill-grounded">Strict Grounding Enforced</span>
+              <span class="pill-meta">PostgreSQL 16 &bull; pgvector HNSW</span>
             </div>
-          }
-        </header>
+          </div>
 
-        <!-- Messages Viewport -->
-        <div class="messages-viewport" #messagesViewport>
+          <div class="toolbar-right">
+            <button 
+              type="button" 
+              class="stream-toggle" 
+              [class.stream-active]="useStreaming()"
+              (click)="toggleStreaming()"
+              title="Toggle streaming response delivery"
+            >
+              <span class="toggle-dot"></span>
+              <span>Streaming: {{ useStreaming() ? 'Active' : 'Sync Fallback' }}</span>
+            </button>
+            <span class="msg-counter">{{ messages().length }} Records</span>
+          </div>
+        </div>
+
+        <!-- Investigation Transcript Container -->
+        <div class="transcript-viewport" #messagesViewport>
           @if (messages().length === 0 && !isLoadingMessages()) {
-            <div class="empty-chat-state">
-              <div class="compliance-icon">⚖️</div>
-              <h3>AML Investigation Assistant</h3>
-              <p>Ask questions grounded directly in authorized banking AML policies, SAR escalation procedures, and customer risk frameworks.</p>
-              
-              <div class="prompt-suggestions">
-                <span class="suggestion-label">Suggested Compliance Inquiries:</span>
-                <div class="suggestion-chips">
-                  <button type="button" class="chip" (click)="useSuggestion('What is the mandatory threshold and timeframe for filing a Currency Transaction Report (CTR)?')">
-                    What is the mandatory CTR threshold and filing deadline?
+            <div class="empty-workbench-state">
+              <div class="empty-header">
+                <h3>AML Policy & Regulatory Guidance Workbench</h3>
+                <p>Formulate queries grounded in authorized bank policies, SAR reporting procedures, and Customer Due Diligence thresholds.</p>
+              </div>
+
+              <div class="quick-inquiries-card">
+                <span class="inquiries-label">Reference Compliance Inquiries:</span>
+                <div class="inquiries-list">
+                  <button 
+                    type="button" 
+                    class="inquiry-btn" 
+                    (click)="useSuggestion('What is the mandatory threshold and timeframe for filing a Currency Transaction Report (CTR)?')"
+                  >
+                    <span class="inquiry-cat">CTR Reporting</span>
+                    <span class="inquiry-text">What is the mandatory CTR threshold and filing deadline?</span>
                   </button>
-                  <button type="button" class="chip" (click)="useSuggestion('Explain Scenario TM-RULE-101 for structuring cash deposits.')">
-                    Explain Scenario TM-RULE-101 for structuring cash deposits.
+                  <button 
+                    type="button" 
+                    class="inquiry-btn" 
+                    (click)="useSuggestion('Explain Scenario TM-RULE-101 for structuring cash deposits.')"
+                  >
+                    <span class="inquiry-cat">Scenario TM-RULE-101</span>
+                    <span class="inquiry-text">Explain Scenario TM-RULE-101 for structuring cash deposits.</span>
                   </button>
-                  <button type="button" class="chip" (click)="useSuggestion('What enhanced due diligence is required for Politically Exposed Persons (PEPs)?')">
-                    What enhanced due diligence is required for PEPs?
+                  <button 
+                    type="button" 
+                    class="inquiry-btn" 
+                    (click)="useSuggestion('What enhanced due diligence is required for Politically Exposed Persons (PEPs)?')"
+                  >
+                    <span class="inquiry-cat">PEP Guidance</span>
+                    <span class="inquiry-text">What enhanced due diligence is required for Politically Exposed Persons (PEPs)?</span>
                   </button>
                 </div>
               </div>
@@ -107,176 +143,211 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
           }
 
           @if (isLoadingMessages()) {
-            <div class="loading-messages">
+            <div class="loading-transcript">
               <div class="spinner"></div>
-              <span>Loading investigation transcript...</span>
+              <span>Retrieving compliance records...</span>
             </div>
           }
 
+          <!-- Case Memorandum Transcript -->
           @for (msg of messages(); track msg.id) {
-            <div class="message-row" [class.user-row]="msg.role === 'USER'" [class.assistant-row]="msg.role !== 'USER'">
-              <div class="message-bubble" [class.user-bubble]="msg.role === 'USER'" [class.assistant-bubble]="msg.role !== 'USER'">
-                <div class="bubble-header">
-                  <span class="sender-name">
-                    @if (msg.role === 'USER') {
-                      Compliance Investigator
-                    } @else {
-                      AML Policy Guardian
-                    }
-                  </span>
-                  <span class="message-time">{{ msg.createdAt | date:'shortTime' }}</span>
+            <div class="memorandum-entry" [class.user-entry]="msg.role === 'USER'" [class.assistant-entry]="msg.role !== 'USER'">
+              <!-- Header Bar of Entry -->
+              <div class="entry-header">
+                <div class="entry-origin">
+                  @if (msg.role === 'USER') {
+                    <span class="origin-label user-label">COMPLIANCE INVESTIGATOR QUERY</span>
+                  } @else {
+                    <span class="origin-label assistant-label">REGULATORY DETERMINATION & GUIDANCE</span>
+                  }
+                  <span class="entry-timestamp">{{ msg.createdAt | date:'mediumTime' }}</span>
                 </div>
 
-                <div class="bubble-content">
-                  @if (!msg.content && isGeneratingResponse() && msg.role !== 'USER') {
-                    <div class="reasoning-indicator">
-                      <span class="dot"></span>
-                      <span class="dot"></span>
-                      <span class="dot"></span>
-                      <span class="status-text">Grounded Compliance Reasoning in progress...</span>
-                    </div>
-                  } @else {
+                @if (msg.role !== 'USER') {
+                  <div class="entry-badge-wrap">
+                    @if (isRefusalMessage(msg.content)) {
+                      <span class="badge-status status-warning">GUARDRAIL: REFUSAL / OUT OF SCOPE</span>
+                    } @else {
+                      <span class="badge-status status-ready">GROUNDED IN APPROVED POLICY</span>
+                    }
+                  </div>
+                }
+              </div>
+
+              <!-- Content Body -->
+              <div class="entry-body">
+                @if (!msg.content && isGeneratingResponse() && msg.role !== 'USER') {
+                  <div class="processing-indicator">
+                    <span class="pulse-indicator"></span>
+                    <span>Retrieving policy sections and synthesizing guidance...</span>
+                  </div>
+                } @else {
+                  <div class="entry-text">
                     {{ msg.content }}
                     @if (isGeneratingResponse() && isStreaming() && msg.id === activeAssistantMsgId) {
-                      <span class="streaming-cursor">|</span>
+                      <span class="cursor-blink">|</span>
                     }
-                  }
-                </div>
+                  </div>
+                }
+              </div>
 
-                <!-- Citations & Source Badges -->
-                @if (msg.citations && msg.citations.length > 0) {
-                  <div class="citations-container">
-                    <span class="citation-title">Grounded Compliance Citations:</span>
-                    <div class="citation-badges">
-                      @for (cite of msg.citations; track ($index + '-' + cite.documentId)) {
-                        <button 
-                          type="button" 
-                          class="citation-badge"
-                          (click)="openSourceDetail(cite)"
-                        >
-                          <span class="cite-doc">{{ cite.documentTitle }}</span>
+              <!-- Citations & Verified Sources Panel -->
+              @if (msg.citations && msg.citations.length > 0) {
+                <div class="citations-panel">
+                  <div class="citations-header">
+                    <span class="citations-caption">Verified Authoritative Sources ({{ msg.citations.length }}):</span>
+                  </div>
+                  <div class="citations-grid">
+                    @for (cite of msg.citations; track ($index + '-' + cite.documentId)) {
+                      <div class="citation-card" (click)="openSourceDetail(cite)">
+                        <div class="cite-top">
+                          <span class="cite-title">{{ cite.documentTitle }}</span>
+                          <span class="cite-match">{{ ((cite.similarityScore || cite.similarity || 0) * 100) | number:'1.0-0' }}% Align</span>
+                        </div>
+                        <div class="cite-coords">
                           @if (cite.section) {
                             <span class="cite-sec">&sect; {{ cite.section }}</span>
                           }
                           @if (cite.pageNumber) {
-                            <span class="cite-page">p. {{ cite.pageNumber }}</span>
+                            <span class="cite-page">Page {{ cite.pageNumber }}</span>
                           }
-                          <span class="cite-score">{{ ((cite.similarityScore || cite.similarity || 0) * 100) | number:'1.0-0' }}% Match</span>
-                        </button>
-                      }
-                    </div>
+                        </div>
+                        @if (cite.chunkSnippet) {
+                          <blockquote class="cite-snippet">"{{ cite.chunkSnippet }}"</blockquote>
+                        }
+                      </div>
+                    }
                   </div>
-                }
-              </div>
+                </div>
+              }
             </div>
           }
 
           @if (isGeneratingResponse() && !isStreaming()) {
-            <div class="message-row assistant-row">
-              <div class="message-bubble assistant-bubble generating">
-                <div class="reasoning-indicator">
-                  <span class="dot"></span>
-                  <span class="dot"></span>
-                  <span class="dot"></span>
-                  <span class="status-text">Grounded Compliance Reasoning in progress...</span>
+            <div class="memorandum-entry assistant-entry">
+              <div class="entry-header">
+                <div class="entry-origin">
+                  <span class="origin-label assistant-label">REGULATORY DETERMINATION IN PROGRESS</span>
+                </div>
+              </div>
+              <div class="entry-body">
+                <div class="processing-indicator">
+                  <span class="pulse-indicator"></span>
+                  <span>Executing deterministic RAG pipeline & similarity search...</span>
                 </div>
               </div>
             </div>
           }
 
           @if (streamingNotice()) {
-            <div class="chat-notice-banner">
-              <span>ℹ️ {{ streamingNotice() }}</span>
-              <button (click)="streamingNotice.set(null)" class="btn-dismiss">&times;</button>
+            <div class="notice-strip info-strip">
+              <span>{{ streamingNotice() }}</span>
+              <button type="button" (click)="streamingNotice.set(null)" class="btn-dismiss">&times;</button>
             </div>
           }
 
           @if (chatError()) {
-            <div class="chat-error-banner">
-              <span>⚠️ {{ chatError() }}</span>
-              <button (click)="chatError.set(null)" class="btn-dismiss">&times;</button>
+            <div class="notice-strip danger-strip">
+              <span>{{ chatError() }}</span>
+              <button type="button" (click)="chatError.set(null)" class="btn-dismiss">&times;</button>
             </div>
           }
         </div>
 
-        <!-- Input Box -->
-        <footer class="chat-input-area">
-          <form (ngSubmit)="sendMessage()" class="input-form">
+        <!-- Query Formulation Area -->
+        <footer class="query-area">
+          <form (ngSubmit)="sendMessage()" class="query-form">
+            <div class="form-header-bar">
+              <label for="queryInput" class="form-label">Compliance Inquiry or Transaction Scenario</label>
+              <span class="key-hint">Enter to submit &bull; Shift+Enter for newline</span>
+            </div>
+
             <textarea
               #queryInput
+              id="queryInput"
               rows="2"
-              placeholder="Ask an AML policy or transaction investigation question... (Press Enter to submit, Shift+Enter for newline)"
+              placeholder="Formulate an AML policy or transaction inquiry (e.g. Under what criteria must a SAR be filed immediately?)..."
               [(ngModel)]="currentQuery"
-              name="query"
+              name="currentQuery"
               [disabled]="isGeneratingResponse()"
               (keydown)="onKeyDown($event)"
+              class="query-textarea"
             ></textarea>
 
-            <div class="input-controls">
-              <span class="char-count">{{ currentQuery.length }} chars</span>
-              <div class="input-buttons">
+            <div class="form-action-bar">
+              <div class="query-meta-stats">
+                <span>{{ currentQuery.length }} characters</span>
+              </div>
+
+              <div class="action-buttons">
                 @if (isGeneratingResponse()) {
                   <button 
                     type="button" 
-                    class="btn-stop" 
+                    class="btn-cancel" 
                     (click)="cancelGeneration()"
-                    title="Stop generating response"
+                    title="Halt response generation"
                   >
-                    ⏹ Stop
+                    <span>Stop</span>
                   </button>
                 }
                 <button 
                   type="submit" 
-                  class="btn-send" 
+                  class="btn-submit-inquiry" 
                   [disabled]="!currentQuery.trim() || isGeneratingResponse()"
                 >
                   @if (isGeneratingResponse()) {
-                    <span class="spinner-sm"></span>
+                    <span class="spinner-tiny"></span>
+                    <span>Processing...</span>
                   } @else {
-                    <span>Send</span>
+                    <span>Submit Inquiry</span>
                   }
                 </button>
               </div>
             </div>
           </form>
         </footer>
-      </section>
+      </main>
 
-      <!-- Expandable Source Details Modal -->
+      <!-- Institutional Source Inspector Modal -->
       @if (selectedCitation()) {
-        <div class="modal-backdrop" (click)="closeSourceDetail()">
-          <div class="modal-dialog" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-              <h3>Source Document Detail</h3>
-              <button class="btn-close" (click)="closeSourceDetail()">&times;</button>
+        <div class="enterprise-modal-backdrop" (click)="closeSourceDetail()">
+          <div class="enterprise-modal-dialog" (click)="$event.stopPropagation()">
+            <div class="enterprise-modal-header">
+              <h3>Authoritative Policy Source Document</h3>
+              <button type="button" class="enterprise-modal-close" (click)="closeSourceDetail()">&times;</button>
             </div>
-            <div class="modal-body">
-              <div class="detail-row">
-                <label>Document Title:</label>
-                <span>{{ selectedCitation()?.documentTitle }}</span>
+            <div class="enterprise-modal-body">
+              <div class="modal-attr-grid">
+                <div class="modal-attr">
+                  <span class="attr-k">Document Title:</span>
+                  <span class="attr-v font-bold">{{ selectedCitation()?.documentTitle }}</span>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">File Reference:</span>
+                  <code class="attr-code">{{ selectedCitation()?.documentFilename }}</code>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">Section / Clause:</span>
+                  <span class="attr-v">{{ selectedCitation()?.section || 'Entire Document' }}</span>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">Page Reference:</span>
+                  <span class="attr-v">{{ selectedCitation()?.pageNumber ? ('Page ' + selectedCitation()?.pageNumber) : 'N/A' }}</span>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">Vector Alignment:</span>
+                  <span class="badge-status status-ready">
+                    {{ (((selectedCitation()?.similarityScore ?? selectedCitation()?.similarity) || 0) * 100) | number:'1.1-1' }}% Cosine Alignment
+                  </span>
+                </div>
               </div>
-              <div class="detail-row">
-                <label>File Reference:</label>
-                <code>{{ selectedCitation()?.documentFilename }}</code>
-              </div>
-              <div class="detail-row">
-                <label>Section:</label>
-                <span>{{ selectedCitation()?.section || 'Full Document' }}</span>
-              </div>
-              <div class="detail-row">
-                <label>Page Number:</label>
-                <span>{{ selectedCitation()?.pageNumber || 'N/A' }}</span>
-              </div>
-              <div class="detail-row">
-                <label>Similarity Score:</label>
-                <span class="score-pill">{{ (((selectedCitation()?.similarityScore ?? selectedCitation()?.similarity) || 0) * 100) | number:'1.1-1' }}% Cosine Alignment</span>
-              </div>
-              <div class="detail-box">
-                <label>Verified Policy Excerpt:</label>
-                <div class="snippet-content">{{ selectedCitation()?.chunkSnippet }}</div>
+
+              <div class="excerpt-box">
+                <div class="excerpt-heading">Verified Extracted Text Excerpt:</div>
+                <div class="excerpt-content">{{ selectedCitation()?.chunkSnippet }}</div>
               </div>
             </div>
-            <div class="modal-footer">
+            <div class="enterprise-modal-footer">
               <button type="button" class="btn-secondary" (click)="closeSourceDetail()">Close</button>
             </div>
           </div>
@@ -285,527 +356,738 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
     </div>
   `,
   styles: [`
-    .chat-container {
+    .workbench-layout {
       display: flex;
-      height: calc(100vh - 65px);
-      background: #f8fafc;
+      height: calc(100vh - 56px);
+      background-color: #f8fafc;
       overflow: hidden;
     }
 
-    /* Sidebar */
-    .sidebar {
+    /* Left Panel: Investigation Case Sidebar */
+    .case-sidebar {
       width: 290px;
       min-width: 260px;
-      background: #0f172a;
-      color: #f1f5f9;
+      background-color: #ffffff;
+      border-right: 1px solid #cbd5e1;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid #1e293b;
     }
-    .sidebar-header {
-      padding: 1rem;
-      border-bottom: 1px solid #1e293b;
+
+    .sidebar-top {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
     }
-    .btn-new-chat {
-      width: 100%;
-      padding: 0.65rem;
-      background: #2563eb;
-      color: #ffffff;
-      border: none;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 0.875rem;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-new-chat:hover:not(:disabled) {
-      background: #1d4ed8;
-    }
-    .session-search {
-      padding: 0.75rem 1rem 0.25rem 1rem;
-    }
-    .session-search input {
-      width: 100%;
-      padding: 0.45rem 0.65rem;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 4px;
-      color: #f1f5f9;
-      font-size: 0.8rem;
-      box-sizing: border-box;
-      outline: none;
-    }
-    .session-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.5rem 0.75rem;
-    }
-    .session-item {
+
+    .sidebar-title-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.65rem 0.75rem;
-      border-radius: 6px;
-      margin-bottom: 0.25rem;
+    }
+
+    .sidebar-heading {
+      font-size: 0.825rem;
+      font-weight: 700;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .session-count-badge {
+      background-color: #f1f5f9;
+      color: #475569;
+      font-size: 0.725rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .btn-new-case {
+      width: 100%;
+      background-color: #1e3a8a;
+      color: #ffffff;
+      border: 1px solid #1e3a8a;
+      border-radius: 4px;
+      padding: 0.45rem;
+      font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background-color 0.12s ease;
+    }
+
+    .btn-new-case:hover:not(:disabled) {
+      background-color: #1d4ed8;
+    }
+
+    .search-filter-box {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .filter-input {
+      width: 100%;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.8rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .cases-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.35rem 0.5rem;
+    }
+
+    .no-cases {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.8rem;
+    }
+
+    .case-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.65rem;
+      border-radius: 4px;
+      margin-bottom: 0.2rem;
+      cursor: pointer;
       border: 1px solid transparent;
+      transition: background-color 0.12s ease;
     }
-    .session-item:hover {
-      background: #1e293b;
+
+    .case-item:hover {
+      background-color: #f1f5f9;
     }
-    .session-item.active {
-      background: #1e3a8a;
-      border-color: #3b82f6;
+
+    .case-item.active {
+      background-color: #eff6ff;
+      border-color: #bfdbfe;
+      border-left: 3px solid #1d4ed8;
     }
-    .session-info {
+
+    .case-info {
       display: flex;
       flex-direction: column;
       overflow: hidden;
       margin-right: 0.5rem;
     }
-    .session-title {
-      font-size: 0.85rem;
-      font-weight: 500;
+
+    .case-title {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: #0f172a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: #f8fafc;
-    }
-    .session-date {
-      font-size: 0.7rem;
-      color: #94a3b8;
-      margin-top: 0.15rem;
-    }
-    .btn-delete-session {
-      background: transparent;
-      border: none;
-      color: #64748b;
-      font-size: 1.1rem;
-      cursor: pointer;
-      padding: 0 0.25rem;
-      line-height: 1;
-    }
-    .btn-delete-session:hover {
-      color: #ef4444;
-    }
-    .empty-sessions {
-      padding: 1.5rem 0.5rem;
-      text-align: center;
-      color: #64748b;
-      font-size: 0.8rem;
     }
 
-    /* Main Chat */
-    .chat-main {
+    .case-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-top: 0.15rem;
+    }
+
+    .btn-close-case {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.15rem;
+    }
+
+    .btn-close-case:hover {
+      color: #ef4444;
+    }
+
+    /* Main Workspace */
+    .workbench-main {
       flex: 1;
       display: flex;
       flex-direction: column;
       height: 100%;
-      background: #ffffff;
+      background-color: #ffffff;
     }
-    .chat-header {
+
+    .case-toolbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.85rem 1.5rem;
-      background: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .header-info h2 {
-      margin: 0;
-      font-size: 1.15rem;
-      color: #0f172a;
-    }
-    .header-badge {
-      font-size: 0.75rem;
-      color: #059669;
-      font-weight: 500;
-      display: inline-block;
-      margin-top: 0.15rem;
-    }
-    .message-counter {
-      font-size: 0.75rem;
-      background: #f1f5f9;
-      color: #475569;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      font-weight: 500;
+      padding: 0.75rem 1.5rem;
+      background-color: #ffffff;
+      border-bottom: 1px solid #cbd5e1;
     }
 
-    /* Messages Viewport */
-    .messages-viewport {
+    .active-case-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.2rem;
+    }
+
+    .case-tags {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pill-grounded {
+      background-color: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.1rem 0.35rem;
+      border-radius: 2px;
+    }
+
+    .pill-meta {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .stream-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+
+    .stream-toggle.stream-active {
+      background-color: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #065f46;
+    }
+
+    .toggle-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #94a3b8;
+    }
+
+    .stream-toggle.stream-active .toggle-dot {
+      background-color: #10b981;
+    }
+
+    .msg-counter {
+      font-size: 0.75rem;
+      color: #64748b;
+      background-color: #f1f5f9;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+    }
+
+    /* Transcript Viewport */
+    .transcript-viewport {
       flex: 1;
       overflow-y: auto;
-      padding: 1.5rem;
+      padding: 1.5rem 2rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 1.25rem;
+      background-color: #f8fafc;
     }
-    .empty-chat-state {
-      max-width: 600px;
-      margin: 3rem auto;
-      text-align: center;
-      color: #475569;
-    }
-    .compliance-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .empty-chat-state h3 {
-      font-size: 1.35rem;
-      color: #0f172a;
-      margin-bottom: 0.5rem;
-    }
-    .empty-chat-state p {
-      font-size: 0.9rem;
-      line-height: 1.5;
-      color: #64748b;
-      margin-bottom: 1.5rem;
-    }
-    .prompt-suggestions {
-      text-align: left;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 1rem;
-    }
-    .suggestion-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: #64748b;
-      letter-spacing: 0.05em;
-    }
-    .suggestion-chips {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    .chip {
-      background: #ffffff;
+
+    .empty-workbench-state {
+      max-width: 650px;
+      margin: 2.5rem auto;
+      background-color: #ffffff;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 0.5rem 0.75rem;
-      font-size: 0.85rem;
-      text-align: left;
-      color: #1e3a8a;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .chip:hover {
-      background: #eff6ff;
-      border-color: #3b82f6;
+      padding: 1.75rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
-    .loading-messages {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 2rem;
-      color: #64748b;
-      font-size: 0.85rem;
-    }
-    .message-row {
-      display: flex;
-      width: 100%;
-    }
-    .user-row {
-      justify-content: flex-end;
-    }
-    .assistant-row {
-      justify-content: flex-start;
-    }
-    .message-bubble {
-      max-width: 78%;
-      padding: 1rem 1.15rem;
-      border-radius: 10px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      line-height: 1.5;
-      font-size: 0.925rem;
-    }
-    .user-bubble {
-      background: #1e3a8a;
-      color: #ffffff;
-      border-bottom-right-radius: 2px;
-    }
-    .assistant-bubble {
-      background: #f8fafc;
+    .empty-header h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
       color: #0f172a;
-      border: 1px solid #e2e8f0;
-      border-bottom-left-radius: 2px;
-    }
-    .bubble-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      font-size: 0.75rem;
-      margin-bottom: 0.4rem;
-      opacity: 0.85;
-    }
-    .user-bubble .sender-name {
-      color: #93c5fd;
-      font-weight: 600;
-    }
-    .assistant-bubble .sender-name {
-      color: #1e40af;
-      font-weight: 600;
-    }
-    .bubble-content {
-      white-space: pre-wrap;
-      word-break: break-word;
+      margin-bottom: 0.35rem;
     }
 
-    /* Citations */
-    .citations-container {
-      margin-top: 0.85rem;
-      padding-top: 0.65rem;
-      border-top: 1px solid #e2e8f0;
+    .empty-header p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 1.25rem;
     }
-    .citation-title {
+
+    .inquiries-label {
       display: block;
       font-size: 0.725rem;
       font-weight: 600;
       color: #475569;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.35rem;
-    }
-    .citation-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-    .citation-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      padding: 0.25rem 0.5rem;
-      font-size: 0.75rem;
-      color: #1e293b;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .citation-badge:hover {
-      background: #f1f5f9;
-      border-color: #2563eb;
-    }
-    .cite-doc {
-      font-weight: 600;
-      color: #1e40af;
-    }
-    .cite-score {
-      background: #dcfce7;
-      color: #166534;
-      font-weight: 600;
-      padding: 0.1rem 0.3rem;
-      border-radius: 3px;
-      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.5rem;
     }
 
-    /* Generating Animation */
-    .reasoning-indicator {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      color: #475569;
-      font-size: 0.85rem;
-    }
-    .dot {
-      width: 7px;
-      height: 7px;
-      background: #2563eb;
-      border-radius: 50%;
-      animation: pulse 1.4s infinite ease-in-out both;
-    }
-    .dot:nth-child(1) { animation-delay: -0.32s; }
-    .dot:nth-child(2) { animation-delay: -0.16s; }
-    @keyframes pulse {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
-
-    .chat-error-banner {
-      background: #fee2e2;
-      border: 1px solid #f87171;
-      color: #991b1b;
-      padding: 0.65rem 0.85rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .btn-dismiss {
-      background: transparent;
-      border: none;
-      color: #991b1b;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-
-    /* Input Area */
-    .chat-input-area {
-      padding: 1rem 1.5rem;
-      background: #ffffff;
-      border-top: 1px solid #e2e8f0;
-    }
-    .input-form {
+    .inquiries-list {
       display: flex;
       flex-direction: column;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0.65rem 0.75rem;
-      background: #ffffff;
-      transition: border-color 0.15s;
+      gap: 0.45rem;
     }
-    .input-form:focus-within {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+
+    .inquiry-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.12s ease;
     }
-    .input-form textarea {
-      width: 100%;
-      border: none;
-      outline: none;
-      resize: none;
-      font-family: inherit;
-      font-size: 0.95rem;
+
+    .inquiry-btn:hover {
+      background-color: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .inquiry-cat {
+      font-size: 0.7rem;
+      font-weight: 700;
+      background-color: #e2e8f0;
+      color: #1e293b;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .inquiry-text {
+      font-size: 0.825rem;
       color: #0f172a;
     }
-    .input-controls {
+
+    .loading-transcript {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      padding: 2.5rem;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+
+    /* Memorandum Entry */
+    .memorandum-entry {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+    }
+
+    .memorandum-entry.user-entry {
+      border-left: 4px solid #1e3a8a;
+    }
+
+    .memorandum-entry.assistant-entry {
+      border-left: 4px solid #059669;
+    }
+
+    .entry-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 0.35rem;
-      padding-top: 0.35rem;
-      border-top: 1px solid #f1f5f9;
+      padding: 0.6rem 1rem;
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
     }
-    .header-actions {
+
+    .entry-origin {
       display: flex;
       align-items: center;
       gap: 0.75rem;
     }
-    .stream-toggle-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      border-radius: 20px;
-      padding: 0.25rem 0.65rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #64748b;
-      cursor: pointer;
-      transition: all 0.2s;
+
+    .origin-label {
+      font-size: 0.725rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
     }
-    .stream-toggle-btn.streaming-on {
-      background: #ecfdf5;
-      border-color: #a7f3d0;
+
+    .user-label {
+      color: #1e3a8a;
+    }
+
+    .assistant-label {
       color: #065f46;
     }
-    .stream-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #94a3b8;
+
+    .entry-timestamp {
+      font-size: 0.7rem;
+      color: #94a3b8;
     }
-    .stream-toggle-btn.streaming-on .stream-dot {
-      background: #10b981;
-      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
-      animation: pulse 1.5s infinite;
+
+    .entry-body {
+      padding: 1rem 1.15rem;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
+
+    .entry-text {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #0f172a;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
-    .streaming-cursor {
+
+    .cursor-blink {
       display: inline-block;
-      color: #2563eb;
+      color: #1d4ed8;
       font-weight: bold;
       animation: blink 0.8s infinite;
       margin-left: 2px;
     }
+
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
     }
-    .input-buttons {
+
+    .processing-indicator {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-    }
-    .btn-stop {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fca5a5;
-      border-radius: 5px;
-      padding: 0.4rem 0.85rem;
-      font-weight: 600;
-      font-size: 0.82rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      transition: background 0.15s;
-    }
-    .btn-stop:hover {
-      background: #fecaca;
-    }
-    .chat-notice-banner {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 0.6rem 1rem;
-      border-radius: 6px;
-      margin-bottom: 0.75rem;
+      color: #64748b;
       font-size: 0.85rem;
+    }
+
+    .pulse-indicator {
+      width: 8px;
+      height: 8px;
+      background-color: #1d4ed8;
+      border-radius: 50%;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Citations Panel */
+    .citations-panel {
+      padding: 0.85rem 1.15rem;
+      background-color: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .citations-caption {
+      font-size: 0.725rem;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .citations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.65rem;
+      margin-top: 0.5rem;
+    }
+
+    .citation-card {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.65rem 0.75rem;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .citation-card:hover {
+      border-color: #1d4ed8;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .cite-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.25rem;
+      gap: 0.5rem;
+    }
+
+    .cite-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #0f172a;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .cite-match {
+      background-color: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.1rem 0.35rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+
+    .cite-coords {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.725rem;
+      color: #64748b;
+      margin-bottom: 0.35rem;
+    }
+
+    .cite-snippet {
+      font-size: 0.75rem;
+      color: #475569;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      border-left: 2px solid #cbd5e1;
+      padding-left: 0.4rem;
+      margin: 0;
+      font-style: italic;
+    }
+
+    /* Notice Strips */
+    .notice-strip {
+      padding: 0.65rem 1rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .char-count {
-      font-size: 0.75rem;
+    .info-strip {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+
+    .danger-strip {
+      background-color: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .btn-dismiss {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    /* Query Area */
+    .query-area {
+      padding: 1rem 1.5rem;
+      background-color: #ffffff;
+      border-top: 1px solid #cbd5e1;
+    }
+
+    .query-form {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.75rem;
+      background-color: #ffffff;
+      transition: border-color 0.15s ease;
+    }
+
+    .query-form:focus-within {
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.1);
+    }
+
+    .form-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    .form-label {
+      font-size: 0.775rem;
+      font-weight: 600;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .key-hint {
+      font-size: 0.7rem;
       color: #94a3b8;
     }
-    .btn-send {
-      background: #1e3a8a;
-      color: #ffffff;
+
+    .query-textarea {
+      width: 100%;
       border: none;
-      border-radius: 5px;
-      padding: 0.4rem 1rem;
-      font-weight: 600;
-      font-size: 0.85rem;
-      cursor: pointer;
+      outline: none;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #0f172a;
+      min-height: 48px;
+    }
+
+    .form-action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.4rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .query-meta-stats {
+      font-size: 0.725rem;
+      color: #94a3b8;
+    }
+
+    .action-buttons {
       display: flex;
       align-items: center;
-      justify-content: center;
-      transition: background 0.15s;
+      gap: 0.5rem;
     }
-    .btn-send:hover:not(:disabled) {
-      background: #1e40af;
+
+    .btn-cancel {
+      background-color: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 3px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.775rem;
+      font-weight: 600;
+      cursor: pointer;
     }
-    .btn-send:disabled {
-      background: #cbd5e1;
+
+    .btn-submit-inquiry {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background-color: #1e3a8a;
+      color: #ffffff;
+      border: 1px solid #1e3a8a;
+      border-radius: 3px;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.825rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
+
+    .btn-submit-inquiry:hover:not(:disabled) {
+      background-color: #1d4ed8;
+      border-color: #1d4ed8;
+    }
+
+    .btn-submit-inquiry:disabled {
+      background-color: #cbd5e1;
+      border-color: #cbd5e1;
       cursor: not-allowed;
     }
 
-    /* Spinners */
+    /* Modal Attr Grid */
+    .modal-attr-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-attr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.825rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .attr-k {
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .attr-v {
+      color: #0f172a;
+    }
+
+    .attr-code {
+      font-family: monospace;
+      font-size: 0.775rem;
+      background-color: #f1f5f9;
+      padding: 0.1rem 0.3rem;
+      border-radius: 2px;
+    }
+
+    .font-bold {
+      font-weight: 600;
+    }
+
+    .excerpt-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 0.75rem;
+    }
+
+    .excerpt-heading {
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+
+    .excerpt-content {
+      font-size: 0.825rem;
+      line-height: 1.5;
+      color: #1e293b;
+      white-space: pre-wrap;
+    }
+
     .spinner {
       width: 16px;
       height: 16px;
       border: 2px solid #cbd5e1;
-      border-top-color: #2563eb;
+      border-top-color: #1e3a8a;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
-    .spinner-sm {
+
+    .spinner-tiny {
       width: 12px;
       height: 12px;
       border: 2px solid rgba(255, 255, 255, 0.4);
@@ -813,109 +1095,9 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
-    }
-
-    /* Modal */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 1rem;
-    }
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: 10px;
-      width: 100%;
-      max-width: 600px;
-      max-height: 85vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    }
-    .modal-header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .modal-header h3 {
-      margin: 0;
-      font-size: 1.15rem;
-      color: #0f172a;
-    }
-    .btn-close {
-      background: transparent;
-      border: none;
-      font-size: 1.35rem;
-      color: #64748b;
-      cursor: pointer;
-    }
-    .modal-body {
-      padding: 1.25rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .detail-row {
-      display: flex;
-      font-size: 0.85rem;
-      gap: 0.5rem;
-    }
-    .detail-row label {
-      font-weight: 600;
-      width: 130px;
-      color: #475569;
-    }
-    .score-pill {
-      background: #dcfce7;
-      color: #166534;
-      font-weight: 600;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-    }
-    .detail-box {
-      margin-top: 0.5rem;
-    }
-    .detail-box label {
-      display: block;
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: #475569;
-      margin-bottom: 0.35rem;
-    }
-    .snippet-content {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 0.85rem;
-      font-size: 0.85rem;
-      line-height: 1.5;
-      color: #1e293b;
-      white-space: pre-wrap;
-    }
-    .modal-footer {
-      padding: 0.75rem 1.25rem;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: flex-end;
-    }
-    .btn-secondary {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      padding: 0.4rem 0.85rem;
-      border-radius: 5px;
-      font-weight: 500;
-      cursor: pointer;
-      color: #334155;
     }
   `]
 })
@@ -968,7 +1150,7 @@ export class ChatComponent implements OnInit {
     if (this.activeAssistantMsgId) {
       this.messages.update(msgs => msgs.map(m => {
         if (m.id === this.activeAssistantMsgId) {
-          const content = m.content ? `${m.content} [Stopped by investigator]` : '[Generation stopped by investigator]';
+          const content = m.content ? `${m.content} [Stopped by investigator]` : '[Stopped by investigator]';
           return { ...m, content };
         }
         return m;
@@ -1177,9 +1359,7 @@ export class ChatComponent implements OnInit {
         sessionId,
         queryText,
         {
-          onStart: () => {
-            // Stream initiated
-          },
+          onStart: () => {},
           onCitations: (citations) => {
             this.messages.update(msgs => msgs.map(m => {
               if (m.id === assistantMsgId) {
@@ -1285,6 +1465,16 @@ export class ChatComponent implements OnInit {
 
   closeSourceDetail(): void {
     this.selectedCitation.set(null);
+  }
+
+  isRefusalMessage(content?: string): boolean {
+    if (!content) return false;
+    const lower = content.toLowerCase();
+    return lower.includes('cannot be found') ||
+           lower.includes('not mentioned') ||
+           lower.includes('no information') ||
+           lower.includes('out of scope') ||
+           lower.includes('unable to verify');
   }
 
   private scrollToBottom(): void {

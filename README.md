@@ -84,9 +84,9 @@ The entire platform underwent an automated test verification cycle covering unit
 
 ```mermaid
 flowchart TD
-    Client["Angular 19 SPA\n(/login, /chat, /history, /documents, /admin/audit)"]
+    Client["Angular 22 SPA (Enterprise Banking UI)\n(/overview, /chat, /history, /documents, /admin/audit, /settings)"]
     API["Spring Boot 3.4 REST API & SSE Gateway\n(Spring Security + JWT)"]
-    Guard["RAG Security Guardrails\n(Boundary Isolation + Instruction Hierarchy)"]
+    Guard["RAG Security Guardrails\n(Boundary Isolation + Instruction Hierarchy + PII Redaction)"]
     PG["PostgreSQL 16 + pgvector\n(HNSW Vector Indexing)"]
     LLM["Spring AI ChatModel\n(Gemini 2.5 Flash / Fallback Engine)"]
 
@@ -96,6 +96,20 @@ flowchart TD
     Guard -->|Cosine Distance Search| PG
     Guard -->|Grounded Delimited Prompt| LLM
 ```
+
+---
+
+## Enterprise Banking Design System (UI/UX)
+
+The frontend has been designed according to Tier-1 financial compliance operations standards, avoiding generic consumer AI tropes:
+
+* **Restrained Enterprise Aesthetic:** Slate neutral palette (`#f8fafc`, `#ffffff`, `#0f172a`), deep banking navy (`#1e3a8a`, `#1d4ed8`), subtle 1px borders, and desaturated semantic status pills.
+* **Institutional Navigation & Header:** Cryptographic security environment pill (`FIU SECURE`), institutional shield crest, clear user identity & role tags.
+* **Operational Overview (`/overview`):** Executive compliance summary showing ready vs processing policy documents, vector store health, grounding guardrail status, and recent investigations.
+* **Investigation Workbench (`/chat`):** Serious policy research workbench featuring analytical case notes, grounded determination badges, structured citation cards with clause (§) and page coordinates, and streaming with automatic synchronous fallback.
+* **Compliance Document Repository (`/documents`):** High-density enterprise table with classification, versioning, multi-stage ingestion pipeline indicators (Apache Tika extraction, chunking, pgvector embedding), and SHA-256 metadata inspection.
+* **Forensic Audit Trail (`/admin/audit`):** Immutable compliance event ledger detailing timestamps, principals, request correlation IDs, security threat alerts, and parsed JSON payload inspection.
+* **System Governance (`/settings`):** Investigator profile attributes, active compliance guardrails, and RAG retrieval architecture parameters.
 
 ---
 

@@ -9,20 +9,20 @@ import { AuditLogItem } from '../../core/models/audit.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="audit-page">
+    <div class="audit-container">
       <header class="page-header">
         <div>
-          <h2>Compliance & Security Audit Log</h2>
-          <p class="subtitle">Immutable audit trail of all compliance queries, prompt injection defenses, and document lifecycle events.</p>
+          <h2>Compliance & Security Audit Trail</h2>
+          <p class="subtitle">Cryptographically signed, immutable record of all compliance queries, prompt injection defenses, and document events.</p>
         </div>
-        <button class="btn-refresh" (click)="loadAuditLogs()" [disabled]="isLoading()">
-          &#x21bb; Refresh Logs
+        <button type="button" class="btn-secondary" (click)="loadAuditLogs()" [disabled]="isLoading()">
+          <span>Refresh Audit Records</span>
         </button>
       </header>
 
-      <!-- Filter Controls -->
-      <section class="toolbar">
-        <div class="filters">
+      <!-- Filter Controls Toolbar -->
+      <section class="toolbar-section">
+        <div class="filter-controls">
           <input 
             type="text" 
             placeholder="Filter by user, resource, or request ID..." 
@@ -31,7 +31,7 @@ import { AuditLogItem } from '../../core/models/audit.models';
           />
 
           <select [(ngModel)]="actionFilter" class="filter-select">
-            <option value="">All Security & Compliance Actions</option>
+            <option value="">All Security & Audit Actions</option>
             <option value="PROMPT_INJECTION_BLOCKED">Prompt Injection Blocked</option>
             <option value="MALICIOUS_DOCUMENT_INJECTION_FLAGGED">Malicious Document Flagged</option>
             <option value="CROSS_USER_ACCESS_DENIED">Cross-User Access Denied</option>
@@ -39,53 +39,52 @@ import { AuditLogItem } from '../../core/models/audit.models';
             <option value="RAG_QUERY_EXECUTED">RAG Query Executed</option>
             <option value="DOCUMENT_UPLOADED">Document Uploaded</option>
             <option value="DOCUMENT_DELETED">Document Deleted</option>
-            <option value="LOGIN">User Login</option>
+            <option value="LOGIN">User Authentication</option>
           </select>
         </div>
 
-        <span class="count-badge">{{ filteredLogs().length }} Audit Events</span>
+        <span class="count-badge">{{ filteredLogs().length }} Audit Records</span>
       </section>
 
-      <!-- Audit Table -->
+      <!-- Audit Log Table -->
       @if (isLoading()) {
-        <div class="loading-state">
+        <div class="state-box">
           <div class="spinner"></div>
-          <span>Loading immutable security audit records...</span>
+          <span>Retrieving immutable audit trail...</span>
         </div>
       } @else if (errorMessage()) {
-        <div class="alert-error">
-          {{ errorMessage() }}
+        <div class="alert-banner alert-danger">
+          <span>{{ errorMessage() }}</span>
         </div>
       } @else if (filteredLogs().length === 0) {
-        <div class="empty-state">
-          <div class="empty-icon">🛡️</div>
-          <h3>No audit logs found</h3>
-          <p>No compliance audit events match your selected filters.</p>
+        <div class="state-box empty-state">
+          <h3>No audit records match your filters</h3>
+          <p>Security alerts and compliance events appear here in chronological order.</p>
         </div>
       } @else {
-        <div class="table-container">
-          <table class="audit-table">
+        <div class="table-card">
+          <table class="enterprise-table">
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th>Timestamp (UTC)</th>
                 <th>User Principal</th>
-                <th>Security / Action</th>
+                <th>Security Action</th>
                 <th>Target Resource</th>
-                <th>Request ID</th>
-                <th>Metadata</th>
+                <th>Correlation Request ID</th>
+                <th>Payload</th>
               </tr>
             </thead>
             <tbody>
               @for (log of filteredLogs(); track log.id) {
                 <tr [class.security-alert-row]="isSecurityAlert(log.action)">
-                  <td class="timestamp-cell">
+                  <td class="timestamp-cell font-mono">
                     {{ log.createdAt | date:'yyyy-MM-dd HH:mm:ss' }}
                   </td>
                   <td>
-                    <span class="user-pill">{{ log.username || 'SYSTEM' }}</span>
+                    <span class="user-pill font-mono">{{ log.username || 'SYSTEM' }}</span>
                   </td>
                   <td>
-                    <span class="action-badge" [class]="getActionBadgeClass(log.action)">
+                    <span class="badge-status" [class]="getActionBadgeClass(log.action)">
                       {{ log.action }}
                     </span>
                   </td>
@@ -93,16 +92,16 @@ import { AuditLogItem } from '../../core/models/audit.models';
                     <div class="resource-cell">
                       <span class="res-type">{{ log.resourceType }}</span>
                       @if (log.resourceId) {
-                        <code class="res-id" [title]="log.resourceId">{{ log.resourceId }}</code>
+                        <code class="res-id font-mono" [title]="log.resourceId">{{ log.resourceId }}</code>
                       }
                     </div>
                   </td>
                   <td>
-                    <code class="request-id">{{ log.requestId || '-' }}</code>
+                    <code class="request-id font-mono">{{ log.requestId || '-' }}</code>
                   </td>
                   <td>
                     @if (log.metadata) {
-                      <button type="button" class="btn-view-meta" (click)="openMetadata(log)">
+                      <button type="button" class="btn-inspect-meta" (click)="openMetadata(log)">
                         View Payload
                       </button>
                     } @else {
@@ -116,36 +115,40 @@ import { AuditLogItem } from '../../core/models/audit.models';
         </div>
       }
 
-      <!-- Metadata Modal -->
+      <!-- Metadata Inspection Modal -->
       @if (selectedLog()) {
-        <div class="modal-backdrop" (click)="closeMetadata()">
-          <div class="modal-dialog" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-              <h3>Security Event Metadata</h3>
-              <button class="btn-close" (click)="closeMetadata()">&times;</button>
+        <div class="enterprise-modal-backdrop" (click)="closeMetadata()">
+          <div class="enterprise-modal-dialog" (click)="$event.stopPropagation()">
+            <div class="enterprise-modal-header">
+              <h3>Security Event Forensic Details</h3>
+              <button type="button" class="enterprise-modal-close" (click)="closeMetadata()">&times;</button>
             </div>
-            <div class="modal-body">
-              <div class="meta-row">
-                <span class="meta-key">Event ID:</span>
-                <code>{{ selectedLog()?.id }}</code>
-              </div>
-              <div class="meta-row">
-                <span class="meta-key">Action:</span>
-                <span class="action-badge" [class]="getActionBadgeClass(selectedLog()?.action || '')">
-                  {{ selectedLog()?.action }}
-                </span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-key">Recorded At:</span>
-                <span>{{ selectedLog()?.createdAt | date:'full' }}</span>
+            <div class="enterprise-modal-body">
+              <div class="modal-attr-grid">
+                <div class="modal-attr">
+                  <span class="attr-k">Event ID:</span>
+                  <code class="attr-v font-mono">{{ selectedLog()?.id }}</code>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">Action:</span>
+                  <span class="badge-status" [class]="getActionBadgeClass(selectedLog()?.action || '')">
+                    {{ selectedLog()?.action }}
+                  </span>
+                </div>
+                <div class="modal-attr">
+                  <span class="attr-k">Timestamp:</span>
+                  <span class="attr-v font-mono">{{ selectedLog()?.createdAt | date:'full' }}</span>
+                </div>
               </div>
 
-              <div class="meta-box">
-                <span class="meta-key">Parsed Security Details:</span>
-                <pre class="json-box">{{ formatMetadata(selectedLog()?.metadata) }}</pre>
+              <div class="json-box-wrapper">
+                <div class="json-header">
+                  <span>Structured Payload Metadata:</span>
+                </div>
+                <pre class="json-payload">{{ formatMetadata(selectedLog()?.metadata) }}</pre>
               </div>
             </div>
-            <div class="modal-footer">
+            <div class="enterprise-modal-footer">
               <button type="button" class="btn-secondary" (click)="closeMetadata()">Close</button>
             </div>
           </div>
@@ -154,43 +157,34 @@ import { AuditLogItem } from '../../core/models/audit.models';
     </div>
   `,
   styles: [`
-    .audit-page {
-      max-width: 1200px;
+    .audit-container {
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 2rem 1.5rem;
+      padding: 1.75rem 1.5rem;
     }
+
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1.5rem;
-    }
-    .page-header h2 {
-      margin: 0 0 0.25rem 0;
-      font-size: 1.6rem;
-      color: #0f172a;
-    }
-    .subtitle {
-      color: #64748b;
-      margin: 0;
-      font-size: 0.9rem;
-    }
-    .btn-refresh {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      padding: 0.5rem 0.85rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      cursor: pointer;
-      color: #334155;
-    }
-    .btn-refresh:hover:not(:disabled) {
-      background: #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1rem;
     }
 
-    /* Toolbar */
-    .toolbar {
+    .page-header h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .toolbar-section {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -198,260 +192,185 @@ import { AuditLogItem } from '../../core/models/audit.models';
       gap: 1rem;
       flex-wrap: wrap;
     }
-    .filters {
+
+    .filter-controls {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.65rem;
       flex: 1;
-      max-width: 750px;
+      max-width: 780px;
     }
+
     .search-input {
       flex: 2;
-      padding: 0.55rem 0.75rem;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.825rem;
       border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      outline: none;
+      border-radius: 4px;
     }
+
     .filter-select {
       flex: 2;
-      padding: 0.55rem 0.75rem;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.825rem;
       border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      background: #ffffff;
-      outline: none;
-    }
-    .count-badge {
-      font-size: 0.8rem;
-      background: #f1f5f9;
-      color: #475569;
-      padding: 0.35rem 0.65rem;
       border-radius: 4px;
+      background-color: #ffffff;
+    }
+
+    .count-badge {
+      font-size: 0.775rem;
+      background-color: #f1f5f9;
+      color: #475569;
+      padding: 0.3rem 0.6rem;
+      border-radius: 3px;
       font-weight: 500;
     }
 
-    /* Table */
-    .table-container {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+    .table-card {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
       overflow-x: auto;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
-    .audit-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.85rem;
-    }
-    .audit-table th {
-      background: #f8fafc;
-      padding: 0.75rem 1rem;
-      font-weight: 600;
-      color: #475569;
-      border-bottom: 1px solid #e2e8f0;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .audit-table td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
-      vertical-align: middle;
-    }
+
     .security-alert-row {
-      background: #fff5f5;
+      background-color: #fef2f2 !important;
     }
+
     .timestamp-cell {
       white-space: nowrap;
-      color: #64748b;
-      font-family: monospace;
-      font-size: 0.8rem;
+      font-size: 0.775rem;
+      color: #475569;
     }
+
     .user-pill {
-      background: #e2e8f0;
+      background-color: #f1f5f9;
       color: #1e293b;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-weight: 600;
-      font-size: 0.75rem;
-    }
-    .action-badge {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
       font-size: 0.725rem;
-      letter-spacing: 0.02em;
+      font-weight: 600;
     }
-    .badge-threat {
-      background: #fee2e2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-    }
-    .badge-warn {
-      background: #fef3c7;
-      color: #92400e;
-      border: 1px solid #fde68a;
-    }
-    .badge-info {
-      background: #eff6ff;
-      color: #1e40af;
-      border: 1px solid #bfdbfe;
-    }
+
     .resource-cell {
       display: flex;
       flex-direction: column;
     }
+
     .res-type {
       font-weight: 600;
       color: #0f172a;
+      font-size: 0.8rem;
     }
+
     .res-id {
-      font-size: 0.725rem;
+      font-size: 0.7rem;
       color: #64748b;
-      max-width: 200px;
+      max-width: 180px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
     .request-id {
-      font-size: 0.75rem;
+      font-size: 0.725rem;
       color: #64748b;
-    }
-    .btn-view-meta {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      color: #2563eb;
-      font-weight: 500;
-    }
-    .btn-view-meta:hover {
-      background: #eff6ff;
-    }
-    .text-muted {
-      color: #94a3b8;
-      font-size: 0.75rem;
     }
 
-    /* Modal */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 1.5rem;
-    }
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: 10px;
-      width: 100%;
-      max-width: 600px;
-      max-height: 85vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    }
-    .modal-header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .modal-header h3 {
-      margin: 0;
-      font-size: 1.15rem;
-      color: #0f172a;
-    }
-    .btn-close {
-      background: transparent;
-      border: none;
-      font-size: 1.35rem;
-      color: #64748b;
+    .btn-inspect-meta {
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #1d4ed8;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      font-weight: 600;
       cursor: pointer;
     }
-    .modal-body {
-      padding: 1.25rem;
-      overflow-y: auto;
+
+    .btn-inspect-meta:hover {
+      background-color: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .modal-attr-grid {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
     }
-    .meta-row {
+
+    .modal-attr {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
+      align-items: center;
+      font-size: 0.825rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #f1f5f9;
     }
-    .meta-key {
+
+    .attr-k {
       font-weight: 600;
       color: #475569;
     }
-    .meta-box {
-      margin-top: 0.5rem;
+
+    .attr-v {
+      color: #0f172a;
     }
-    .json-box {
-      background: #0f172a;
+
+    .json-box-wrapper {
+      background-color: #0f172a;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .json-header {
+      padding: 0.5rem 0.75rem;
+      background-color: #1e293b;
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+
+    .json-payload {
+      padding: 0.85rem;
       color: #38bdf8;
-      padding: 1rem;
-      border-radius: 6px;
-      font-size: 0.8rem;
+      font-size: 0.775rem;
       overflow-x: auto;
       white-space: pre-wrap;
       word-break: break-all;
-    }
-    .modal-footer {
-      padding: 0.75rem 1.25rem;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: flex-end;
-    }
-    .btn-secondary {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      padding: 0.4rem 0.85rem;
-      border-radius: 5px;
-      cursor: pointer;
-      color: #334155;
+      max-height: 300px;
     }
 
-    .loading-state, .empty-state {
+    .state-box {
       text-align: center;
       padding: 3rem;
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
       color: #64748b;
-      background: #ffffff;
-      border: 1px dashed #cbd5e1;
-      border-radius: 8px;
     }
-    .empty-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
+
+    .empty-state h3 {
+      font-size: 1.05rem;
+      color: #0f172a;
+      margin-bottom: 0.35rem;
     }
+
     .spinner {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border: 2px solid #cbd5e1;
       border-top-color: #1e3a8a;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 0.5rem auto;
     }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
-    }
-    .alert-error {
-      background: #fee2e2;
-      color: #991b1b;
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      font-size: 0.875rem;
     }
   `]
 })
@@ -481,7 +400,7 @@ export class AuditComponent implements OnInit {
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err?.error?.detail || 'Failed to load audit logs.');
+        this.errorMessage.set(err?.error?.detail || 'Failed to load audit records.');
       }
     });
   }
@@ -518,12 +437,12 @@ export class AuditComponent implements OnInit {
 
   getActionBadgeClass(action: string): string {
     if (this.isSecurityAlert(action)) {
-      return 'badge-threat';
+      return 'status-danger';
     }
     if (action.includes('DELETED') || action.includes('FAILED')) {
-      return 'badge-warn';
+      return 'status-warning';
     }
-    return 'badge-info';
+    return 'status-info';
   }
 
   openMetadata(log: AuditLogItem): void {

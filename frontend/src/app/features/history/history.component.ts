@@ -10,297 +10,266 @@ import { ChatSession } from '../../core/models/chat.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="history-page">
+    <div class="history-container">
       <header class="page-header">
         <div>
-          <h2>Investigation History</h2>
-          <p class="subtitle">Review, resume, or audit your previous AML policy investigations.</p>
+          <h2>AML Investigation Case History</h2>
+          <p class="subtitle">Complete chronological record of all compliance inquiries, scenario analyses, and policy cross-references.</p>
         </div>
-        <button class="btn-primary" (click)="startNewInvestigation()">
-          + New Investigation
+        <button type="button" class="btn-primary" (click)="startNewInvestigation()">
+          + New Case Inquiry
         </button>
       </header>
 
-      <div class="toolbar">
+      <section class="toolbar-section">
         <div class="search-box">
           <input 
             type="text" 
-            placeholder="Search investigations by title..." 
+            placeholder="Search investigation cases by title..." 
             [(ngModel)]="searchTerm"
+            class="search-input"
           />
         </div>
-        <span class="count-badge">{{ filteredSessions().length }} Investigations</span>
-      </div>
+        <span class="count-badge">{{ filteredSessions().length }} Recorded Cases</span>
+      </section>
 
       @if (isLoading()) {
-        <div class="loading-state">
+        <div class="state-box">
           <div class="spinner"></div>
-          <span>Loading historical investigations...</span>
+          <span>Loading historical compliance cases...</span>
         </div>
       } @else if (errorMessage()) {
-        <div class="alert-error">
-          {{ errorMessage() }}
+        <div class="alert-banner alert-danger">
+          <span>{{ errorMessage() }}</span>
         </div>
       } @else if (filteredSessions().length === 0) {
-        <div class="empty-state">
-          <div class="empty-icon">📁</div>
-          <h3>No investigations found</h3>
-          <p>You haven't conducted any AML policy investigations yet or no results matched your search.</p>
-          <button class="btn-primary" (click)="startNewInvestigation()">
+        <div class="state-box empty-state">
+          <h3>No investigation records found</h3>
+          <p>No historical policy inquiries match your search criteria.</p>
+          <button type="button" class="btn-secondary" (click)="startNewInvestigation()">
             Start First Investigation
           </button>
         </div>
       } @else {
-        <div class="sessions-grid">
-          @for (session of filteredSessions(); track session.id) {
-            <div class="session-card" (click)="openSession(session.id)">
-              <div class="card-header">
-                <h3 class="card-title">{{ session.title }}</h3>
-                <span class="status-pill">{{ session.messageCount }} Messages</span>
-              </div>
-              
-              <div class="card-meta">
-                <div class="meta-item">
-                  <span class="meta-label">Started:</span>
-                  <span class="meta-value">{{ session.createdAt | date:'medium' }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">Last Updated:</span>
-                  <span class="meta-value">{{ session.updatedAt | date:'medium' }}</span>
-                </div>
-              </div>
-
-              <div class="card-actions">
-                <button 
-                  type="button" 
-                  class="btn-resume"
-                  (click)="openSession(session.id)"
-                >
-                  Resume Investigation &rarr;
-                </button>
-                <button 
-                  type="button" 
-                  class="btn-delete"
-                  title="Delete Session"
-                  (click)="deleteSession(session.id, $event)"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          }
+        <div class="table-card">
+          <table class="enterprise-table">
+            <thead>
+              <tr>
+                <th>Investigation Title / Scenario</th>
+                <th>Inquiry Count</th>
+                <th>Case Initiated</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (session of filteredSessions(); track session.id) {
+                <tr>
+                  <td class="scenario-cell" (click)="openSession(session.id)">
+                    <span class="scenario-title">{{ session.title }}</span>
+                    <span class="scenario-id font-mono">ID: {{ session.id }}</span>
+                  </td>
+                  <td>
+                    <span class="badge-count">{{ session.messageCount }} Inquiries</span>
+                  </td>
+                  <td class="date-cell">{{ session.createdAt | date:'medium' }}</td>
+                  <td class="date-cell">{{ session.updatedAt | date:'medium' }}</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button 
+                        type="button" 
+                        class="btn-row-action"
+                        (click)="openSession(session.id)"
+                      >
+                        Resume &rarr;
+                      </button>
+                      <button 
+                        type="button" 
+                        class="btn-row-delete"
+                        title="Delete investigation record"
+                        (click)="deleteSession(session.id, $event)"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
     </div>
   `,
   styles: [`
-    .history-page {
-      max-width: 1100px;
+    .history-container {
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 2rem 1.5rem;
+      padding: 1.75rem 1.5rem;
     }
+
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1.5rem;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1rem;
     }
+
     .page-header h2 {
-      margin: 0 0 0.25rem 0;
-      font-size: 1.6rem;
+      font-size: 1.35rem;
+      font-weight: 700;
       color: #0f172a;
+      margin-bottom: 0.25rem;
     }
+
     .subtitle {
+      font-size: 0.85rem;
       color: #64748b;
-      margin: 0;
-      font-size: 0.9rem;
     }
-    .toolbar {
+
+    .toolbar-section {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       gap: 1rem;
     }
+
     .search-box {
       flex: 1;
-      max-width: 450px;
+      max-width: 480px;
     }
-    .search-box input {
+
+    .search-input {
       width: 100%;
-      padding: 0.65rem 0.85rem;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.825rem;
       border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      outline: none;
+      border-radius: 4px;
       box-sizing: border-box;
     }
-    .search-box input:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
+
     .count-badge {
-      font-size: 0.8rem;
-      background: #f1f5f9;
+      font-size: 0.775rem;
+      background-color: #f1f5f9;
       color: #475569;
-      padding: 0.35rem 0.65rem;
-      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+      border-radius: 3px;
       font-weight: 500;
     }
-    .btn-primary {
-      background: #1e3a8a;
-      color: #ffffff;
-      border: none;
-      padding: 0.65rem 1.15rem;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 0.875rem;
-      cursor: pointer;
-      transition: background 0.15s;
+
+    .table-card {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      overflow-x: auto;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
-    .btn-primary:hover {
-      background: #172554;
-    }
-    .sessions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 1.25rem;
-    }
-    .session-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 1.25rem;
+
+    .scenario-cell {
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-      transition: all 0.15s;
+      gap: 0.15rem;
     }
-    .session-card:hover {
-      border-color: #3b82f6;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-      transform: translateY(-1px);
-    }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 0.75rem;
-      gap: 0.5rem;
-    }
-    .card-title {
-      font-size: 1rem;
+
+    .scenario-title {
+      font-weight: 600;
       color: #0f172a;
-      margin: 0;
-      line-height: 1.35;
-      font-weight: 600;
     }
-    .status-pill {
-      background: #eff6ff;
+
+    .scenario-cell:hover .scenario-title {
       color: #1d4ed8;
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      white-space: nowrap;
+      text-decoration: underline;
     }
-    .card-meta {
-      font-size: 0.8rem;
-      color: #64748b;
-      margin-bottom: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-    .meta-item {
-      display: flex;
-      justify-content: space-between;
-    }
-    .meta-label {
-      font-weight: 500;
+
+    .scenario-id {
+      font-size: 0.7rem;
       color: #94a3b8;
     }
-    .meta-value {
-      color: #334155;
+
+    .badge-count {
+      background-color: #f1f5f9;
+      color: #475569;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      font-size: 0.725rem;
+      font-weight: 500;
     }
-    .card-actions {
+
+    .date-cell {
+      white-space: nowrap;
+      font-size: 0.775rem;
+      color: #64748b;
+    }
+
+    .action-buttons {
       display: flex;
-      justify-content: space-between;
+      gap: 0.45rem;
       align-items: center;
-      padding-top: 0.75rem;
-      border-top: 1px solid #f1f5f9;
     }
-    .btn-resume {
-      background: transparent;
+
+    .btn-row-action {
+      background: none;
       border: none;
-      color: #2563eb;
+      color: #1d4ed8;
+      font-size: 0.775rem;
       font-weight: 600;
-      font-size: 0.85rem;
       cursor: pointer;
       padding: 0;
     }
-    .btn-resume:hover {
+
+    .btn-row-action:hover {
       text-decoration: underline;
     }
-    .btn-delete {
-      background: transparent;
+
+    .btn-row-delete {
+      background: none;
       border: none;
-      color: #ef4444;
-      font-size: 0.8rem;
+      color: #dc2626;
+      font-size: 0.75rem;
       cursor: pointer;
+      padding: 0 0.25rem;
     }
-    .btn-delete:hover {
+
+    .btn-row-delete:hover {
       text-decoration: underline;
     }
-    .empty-state {
+
+    .state-box {
       text-align: center;
-      padding: 3rem 1.5rem;
-      background: #ffffff;
-      border: 1px dashed #cbd5e1;
-      border-radius: 10px;
-    }
-    .empty-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .empty-state h3 {
-      font-size: 1.25rem;
-      color: #0f172a;
-      margin-bottom: 0.5rem;
-    }
-    .empty-state p {
-      color: #64748b;
-      font-size: 0.9rem;
-      margin-bottom: 1.5rem;
-    }
-    .loading-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
       padding: 3rem;
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
       color: #64748b;
-      font-size: 0.9rem;
     }
+
+    .empty-state h3 {
+      font-size: 1.05rem;
+      color: #0f172a;
+      margin-bottom: 0.35rem;
+    }
+
+    .empty-state p {
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
     .spinner {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border: 2px solid #cbd5e1;
       border-top-color: #1e3a8a;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
+      margin: 0 auto 0.5rem auto;
     }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
-    }
-    .alert-error {
-      background: #fee2e2;
-      color: #991b1b;
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      font-size: 0.875rem;
     }
   `]
 })
@@ -350,14 +319,14 @@ export class HistoryComponent implements OnInit {
 
   deleteSession(sessionId: string, event: Event): void {
     event.stopPropagation();
-    if (!confirm('Are you sure you want to delete this investigation?')) return;
+    if (!confirm('Are you sure you want to delete this investigation case?')) return;
 
     this.chatService.deleteSession(sessionId).subscribe({
       next: () => {
         this.sessions.update(list => list.filter(s => s.id !== sessionId));
       },
       error: (err) => {
-        alert(err?.error?.detail || 'Failed to delete session.');
+        alert(err?.error?.detail || 'Failed to delete case.');
       }
     });
   }
