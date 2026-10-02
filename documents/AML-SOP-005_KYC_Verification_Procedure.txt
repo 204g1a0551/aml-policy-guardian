@@ -1,0 +1,37 @@
+AML-SOP-005: Know Your Customer (KYC) Verification Procedure
+Version: v3.5
+Classification: Standard Operating Procedure
+Effective Date: 2026-02-10
+Owner: Central Onboarding Operations & Client Due Diligence
+
+Section 1: Purpose and Regulatory Foundation
+This Standard Operating Procedure sets forth the mandatory operational requirements for validating customer identity, authenticating official government credentials, identifying ultimate beneficial ownership, and verifying sources of funds and wealth pursuant to the FinCEN Customer Due Diligence (CDD) Rule and global AML standards.
+
+Section 2: Verification of Natural Persons (Retail & Private Clients)
+Before any transactional account may be activated, onboarding analysts must obtain and verify:
+1. Primary Identification: Unexpired government-issued photo identification (Passport, National Identity Card, or State Driver's License). The document must be verified via automated forensic MRZ/barcode scanning and biometric facial liveness matching.
+2. Proof of Residential Address: Utility bill, council tax statement, or bank statement dated within 90 calendar days of account application. PO Boxes are strictly prohibited as primary addresses.
+3. Tax Identification Number: Social Security Number (SSN), Individual Taxpayer Identification Number (ITIN), or foreign functional equivalent.
+
+Section 3: Legal Entity Due Diligence and Beneficial Ownership (UBO)
+For corporate accounts, partnerships, and trusts, the following corporate records are required:
+1. Certified Certificate of Incorporation or Articles of Organization.
+2. Operating Agreement, Bylaws, or Partnership Agreement defining governance and authorized signers.
+3. Beneficial Ownership Declaration Form identifying every individual who directly or indirectly owns or controls 25% or more of the equity interests of the legal entity.
+4. Identification of one Senior Managing Official (CEO, CFO, Managing Partner) exercising significant executive control.
+5. All beneficial owners holding 25% or greater equity must undergo full individual identity verification in accordance with Section 2.
+
+Section 4: Source of Wealth (SOW) and Source of Funds (SOF) Standards
+- Source of Funds (SOF): Refers to the specific origin of initial deposits and ongoing transactional flows (e.g. monthly salary, sale of securities, intercompany loan). Must be verified by pay slips or wire confirmations.
+- Source of Wealth (SOW): Refers to the aggregate economic origin of the customer's total net worth (e.g. long-term business equity, inheritance, commercial real estate holdings). SOW verification is mandatory for all High-Risk customers, Private Banking clients, and PEPs. Acceptable corroborating evidence includes audited financial statements, tax filings, inheritance probate certificates, or title deeds.
+
+Section 5: Automated Sanctions and PEP Screening
+All applicant names, beneficial owners, and authorized signatories must be screened against:
+1. OFAC Specially Designated Nationals (SDN) and Sectoral Sanctions lists.
+2. UN, EU, UK HM Treasury, and local regulatory sanctions lists.
+3. Global Politically Exposed Persons (PEP) databases and adverse media registers.
+Automated screening utilizes fuzzy logic matching with a mandatory similarity threshold of 85%. Any potential hit generates an automated compliance hold requiring Level-2 analyst adjudication prior to account opening.
+
+Section 6: Managing Incomplete and Expired KYC
+1. If an applicant fails to submit requested identity documentation within 14 calendar days, the application is automatically closed.
+2. For existing accounts, when government credentials expire or periodic review updates are overdue by 30 days following formal notification, debit restrictions (outgoing transaction freeze) must be applied automatically by core banking systems until compliant KYC is refreshed.

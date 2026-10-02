@@ -1,0 +1,38 @@
+AML-POL-002: Enterprise Customer Risk Assessment Policy
+Version: v3.1
+Classification: Bank-Wide Compliance Policy
+Effective Date: 2026-01-10
+Owner: Global Anti-Money Laundering & Financial Crimes Compliance Committee
+
+Section 1: Policy Statement and Mandate
+The Bank requires an enterprise-wide, risk-based approach to assessing customer financial crime risks before establishing a banking relationship and continually throughout the business relationship. This policy complies with FATF Recommendations, the Wolfsberg Standards, and FinCEN CDD Rule guidelines.
+
+Section 2: Four Pillars of Risk Assessment
+The Customer Risk Rating (CRR) model evaluates four core risk dimensions:
+1. Customer Entity Risk: Natural person vs. legal entity, complex multi-layered ownership structures, bearer share usage, trust accounts, and ultimate beneficial ownership (UBO) transparency.
+2. Geographic Risk: Customer nationality, country of tax residence, incorporation location, and geographical destinations of counterparty fund transfers (specifically assessing FATF grey/black lists and Basel AML index scores).
+3. Product and Service Risk: Cash-intensive services, trade finance instruments, private banking concierge services, non-recourse international factoring, and cross-border commercial wire facilities.
+4. Channel Risk: Direct in-person branch onboarding versus non-face-to-face digital onboarding, third-party intermediary introductions, and API-driven banking-as-a-service accounts.
+
+Section 3: Risk Rating Methodology and Scoring Matrix
+Each risk pillar is scored between 1 and 25 points, resulting in an aggregate Customer Risk Score (CRS) between 1 and 100:
+- Tier 1 - Low Risk (Score 1 to 40): Standard domestic wage-earners, listed public corporations, government agencies, and regulated credit institutions. Standard Customer Due Diligence (CDD) applies.
+- Tier 2 - Medium Risk (Score 41 to 74): Domestic commercial enterprises, retail commercial trading, established SMEs with clear commercial operations. Standard CDD with monitoring applied.
+- Tier 3 - High Risk (Score 75 to 100): Entities and individuals with non-transparent ownership, international wire exposure, or operating in cash-heavy sectors. Enhanced Due Diligence (EDD) is mandatory.
+
+Section 4: Mandatory High-Risk Designations
+The following categories are automatically assigned High Risk regardless of initial scoring:
+1. Politically Exposed Persons (PEPs), their direct family members, and known close associates.
+2. Virtual Asset Service Providers (VASPs), cryptocurrency exchanges, and blockchain custody operators.
+3. Money Services Businesses (MSBs), currency remitters, and check cashers.
+4. Defense contractors, precious metals and stone dealers, and high-end art auction houses.
+5. Non-Governmental Organizations (NGOs) and charities operating in active combat zones or sanctioned jurisdictions.
+
+Section 5: Periodic Review Cadence
+Customer files must undergo mandatory periodic refresh according to their risk tier:
+- High Risk Customers: Reviewed every 12 months (annual full review including adverse media refresh, UBO re-verification, and source-of-wealth documentation).
+- Medium Risk Customers: Reviewed every 24 months.
+- Low Risk Customers: Reviewed every 36 months, or upon event-driven triggers (such as material change in ownership or negative news).
+
+Section 6: Relationship Exit and De-Risking
+When a customer fails to provide required KYC refresh documentation within 30 days of the second reminder notice, or where source of wealth cannot be legitimately validated, the AML Compliance Officer must initiate an Account Exit Protocol. The customer's transaction capabilities will be frozen immediately pending AML Committee closure review.

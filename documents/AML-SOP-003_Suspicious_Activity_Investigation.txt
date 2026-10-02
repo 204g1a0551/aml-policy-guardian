@@ -1,0 +1,41 @@
+AML-SOP-003: Suspicious Activity Investigation Procedure
+Version: v4.0
+Classification: Highly Confidential Compliance Procedure
+Effective Date: 2026-01-20
+Owner: Financial Intelligence Unit (FIU) Investigation Team
+
+Section 1: Purpose and Regulatory Foundation
+This Standard Operating Procedure defines the structured methodology for investigating complex financial crime cases, escalating potential money laundering or terrorist financing activities, and drafting Suspicious Activity Reports (SAR). It adheres strictly to 31 U.S.C. 5318(g) and FinCEN SAR filing directives.
+
+Section 2: Case Ingestion and Assignment
+Cases are initiated through four channels:
+1. Automated Transaction Monitoring Alerts escalated by Level-1 Analysts.
+2. Internal Suspicious Activity Referrals (SAR-R) from branch personnel, commercial lenders, or private bankers.
+3. Law Enforcement Inquiries (Subpoenas, National Security Letters, or FinCEN 314(a) requests).
+4. Adverse Media alerts identifying formal indictments, fraud arrests, or regulatory enforcement actions against bank customers.
+
+Section 3: Standard Investigative Five-Step Methodology
+Investigators must execute the following five sequential steps during every investigation:
+Step 1 - Customer Profile Baseline: Review account opening documents, expected turnover, stated source of wealth, line of business, and historical transaction patterns across all linked accounts.
+Step 2 - Transaction Flow & Velocity Mapping: Analyze bank statements over a 12 to 24 month lookback period. Reconcile debits and credits, identifying high-frequency round-dollar transactions, funnel accounts, or sudden spikes.
+Step 3 - Counterparty Verification: Screen all major remitting and beneficiary entities. Verify corporate registrations via commercial registries (e.g. OpenCorporates, state corporate databases) to detect shell corporations without physical addresses or employees.
+Step 4 - External Intelligence & Adverse Media: Perform targeted screening using external intelligence databases (World-Check, LexisNexis, Dow Jones) for criminal proceedings, sanctions hits, or political exposure.
+Step 5 - Economic Rationality Evaluation: Determine whether the identified activity aligns with plausible legitimate business or personal purposes. If transactions lack commercial reasonableness, the activity is deemed suspicious.
+
+Section 4: Common Red Flag Indicators
+- Structuring: Consecutive cash deposits of $9,500, $9,800, or $9,000 within days across different teller windows to evade the $10,000 Currency Transaction Report (CTR) threshold.
+- Shell Company Operations: Commercial accounts receiving high-value incoming wires followed immediately by identical round-sum outbound wires to overseas accounts, with no payroll, lease, or operating expenses.
+- Funnel Account Usage: Multiple geographically dispersed debit card deposits into a single consumer checking account followed by swift ATM withdrawals or wire transfers from a border state.
+- Uncooperative Customer: Refusal to supply supporting invoices, shipping bills of lading, or legitimate contracts upon issuance of an official Request for Information (RFI).
+
+Section 5: SAR Narrative Standards (The 5 Ws and How)
+The SAR Narrative must be factual, chronological, and precise. It must clearly answer:
+- WHO conducted the transactions (names, TIN/SSN, account numbers, business roles).
+- WHAT instruments and financial mechanisms were utilized (wire transfer, ACH, cash, cashier's checks).
+- WHERE the activity originated and where funds were remitted (branch locations, countries, intermediary banks).
+- WHEN the suspicious behavior occurred (dates, timeframes, frequency).
+- WHY the investigator determined the transactions were suspicious (absence of legitimate business rationale, structuring evidence).
+- HOW the scheme operated end-to-end.
+
+Section 6: Strict Anti-Tipping-Off Mandate
+Federal and international law strictly prohibits disclosing to any subject or third party that a SAR has been filed or that an investigation is underway (31 U.S.C. 5318(g)(2)). Unauthorized tipping off carries severe criminal and civil penalties, including immediate termination of employment, regulatory fines, and imprisonment up to 5 years.

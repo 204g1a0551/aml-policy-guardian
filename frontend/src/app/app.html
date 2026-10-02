@@ -1,0 +1,24 @@
+<div class="app-layout">
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="bank-logo">🏛️ BANK COMPLIANCE</span>
+      <span class="nav-subtitle">AML Policy & Investigation Assistant</span>
+    </div>
+
+    <div class="nav-links">
+      @if (authService.isAuthenticated()) {
+        <a routerLink="/investigation" routerLinkActive="active-link">Investigation Assistant</a>
+        <div class="user-pill">
+          <span>{{ authService.currentUser()?.fullName || authService.currentUser()?.username }}</span>
+          <button (click)="onLogout()" class="btn-logout">Sign Out</button>
+        </div>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active-link">Sign In</a>
+      }
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

@@ -1,0 +1,38 @@
+AML-GUIDE-004: Transaction Escalation Guidelines and Decision Matrix
+Version: v2.8
+Classification: Compliance Operating Guideline
+Effective Date: 2026-02-15
+Owner: Office of the Money Laundering Reporting Officer (MLRO)
+
+Section 1: Objective and Governance
+These guidelines provide a formalized decision framework for escalating suspicious transactions, high-risk alerts, and emergent financial crime situations to senior compliance leadership, the MLRO, and executive committees.
+
+Section 2: Four-Tier Escalation Hierarchy
+1. Tier 1 - Alert Ingestion & L1 Review: Handled by AML Operations Analysts. Focuses on clearing routine false positives and triaging complex behaviors.
+2. Tier 2 - Senior Case Investigation: Handled by Senior FIU Investigators. Conducts in-depth forensic analysis, counterparty lookbacks, and SAR recommendations.
+3. Tier 3 - Compliance Management & MLRO Approval: Handled by the Chief AML Officer / MLRO. Holds sole authority to approve SAR filings, direct account freezing, or authorize law enforcement disclosures.
+4. Tier 4 - Executive AML Oversight Committee: Receives quarterly filings, material regulatory exposure reports, and approves permanent customer de-risking for enterprise clients.
+
+Section 3: Priority Escalation Categories & Response SLAs
+- Critical Priority 1 (4-Hour Response SLA):
+  * Positive, confirmed matches against OFAC Sanctions, UN, or EU consolidated lists.
+  * Direct nexus to terrorism financing or proliferations networks.
+  * Credible red flags indicating child exploitation or human trafficking proceeds.
+  Action: Immediate freeze of associated transaction and real-time verbal and written briefing to the MLRO.
+- High Priority 2 (24-Hour Response SLA):
+  * Confirmed structuring schemes aggregating in excess of $100,000 within a 30-day window.
+  * Law Enforcement Grand Jury subpoenas or FinCEN 314(a) subject hits.
+  * Material bribery or corruption schemes involving senior foreign political figures.
+  Action: Immediate escalation from L1 to Senior FIU Investigator with priority case queuing.
+- Medium Priority 3 (72-Hour Response SLA):
+  * Persistent lack of customer response to multiple Requests for Information (RFI).
+  * Recurring uncharacteristic transaction spikes without adequate commercial documentation.
+
+Section 4: Protocol for Transaction Holds and Account Freezing
+Administrative holds may only be applied under the explicit written authorization of the MLRO or designated Legal Counsel under any of the following conditions:
+1. Valid OFAC sanctions block requirement.
+2. Formal court-ordered restraining order or criminal asset forfeiture warrant.
+3. Imminent flight risk involving active cybercrime or fraudulent unauthorized diversion of depositor funds exceeding $50,000.
+
+Section 5: USA PATRIOT Act Section 314(b) Information Sharing
+To enhance cross-institutional intelligence against illicit networks, Senior Investigators may initiate voluntary 314(b) requests with participating peer financial institutions. All 314(b) transmissions must be encrypted and logged in the FIU audit database.

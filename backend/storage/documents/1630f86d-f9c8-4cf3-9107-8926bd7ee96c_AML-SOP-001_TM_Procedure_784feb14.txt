@@ -1,0 +1,30 @@
+AML-SOP-001: Transaction Monitoring Standard Operating Procedure
+Version: v2.4
+Classification: Internal Compliance Procedure
+Effective Date: 2026-02-01
+Owner: Financial Intelligence Unit (FIU)
+
+Section 1: Purpose and Operational Scope
+This Standard Operating Procedure governs daily automated and manual transaction monitoring operations across all personal, commercial, and correspondent banking lines. The primary objective is early detection of money laundering schemes, terrorist financing vectors, sanctions evasion, and fraud rings.
+
+Section 2: Automated Monitoring Rule Matrix
+The Bank operates real-time and post-transaction surveillance algorithms configured with the following deterministic scenario triggers:
+1. Scenario TM-RULE-101 (Structuring and Smurfing): Multiple cash deposits or withdrawals conducted across multiple branch locations or ATMs within a rolling 72-hour window where individual amounts range between $7,000 and $9,999 and total aggregated cash exceeds $10,000.
+2. Scenario TM-RULE-202 (Velocity and Spike): Sudden transactional volume exceeding 300% of the customer's trailing 90-day historical average transaction velocity without prior operational notice.
+3. Scenario TM-RULE-303 (Rapid Movement / Flow-Through): Incoming wire transfers exceeding $50,000 followed by outgoing wires or cash withdrawals of 85% or more of the funds within 24 hours, indicative of pass-through shell activity.
+4. Scenario TM-RULE-404 (High-Risk Corridor Remittances): Any cross-border wire transfer equal to or exceeding $10,000 involving designated FATF non-cooperative jurisdictions, high-risk offshore financial centers, or sanctioned border zones.
+
+Section 3: Alert Triage and Service Level Agreements (SLA)
+- Alert Queue Assignment: Alerts are ingested daily at 06:00 UTC and assigned to Level-1 AML Analysts based on portfolio specialization.
+- Triage SLA: Level-1 Analysts must complete initial alert review within 24 business hours of alert generation.
+- Investigation SLA: If an alert is escalated to an investigation case, full investigative review and source-of-funds verification must be completed within 14 business days.
+- SAR Filing Deadline: Suspicious Activity Reports (SAR) must be filed with FinCEN or the national FIU no later than 30 calendar days from the date of initial alert review and suspicious determination (extended to 60 days if no suspect was initially identified).
+
+Section 4: Alert Disposition Standards
+Analysts must assign one of the following formal dispositions to each reviewed alert:
+1. False Positive (FP): Transaction activity is supported by legitimate customer business profile, verified invoices, or known seasonal patterns. Requires clear rationalization narrative and supporting document attachment.
+2. Request for Information (RFI): Sent to the Relationship Manager (RM) or front office within 24 hours when economic rationale cannot be verified from available documentation. The RM has 3 business days to respond.
+3. Escalated to Level-2 Case: The activity cannot be commercially justified, indicates red flags of layering/integration, or meets mandatory escalation criteria.
+
+Section 5: Record Retention and Auditability
+All transaction monitoring alerts, analyst case notes, supervisory approvals, and attached evidence must be archived in the compliance data repository for a statutory minimum of 7 years from the date of alert closure.
