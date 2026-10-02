@@ -31,5 +31,6 @@ export interface CreateChatSessionRequest {
 }
 
 export interface AskQuestionRequest {
-  query: string;
+  message: string;
+  query?: string;
 }

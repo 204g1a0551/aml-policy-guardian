@@ -958,7 +958,7 @@ export class ChatComponent implements OnInit {
     this.currentQuery = '';
     this.scrollToBottom();
 
-    this.chatService.askQuestion(sessionId, { query: queryText }).subscribe({
+    this.chatService.askQuestion(sessionId, { message: queryText, query: queryText }).subscribe({
       next: (responseMsg) => {
         this.isGeneratingResponse.set(false);
         this.messages.update(msgs => [...msgs, responseMsg]);
