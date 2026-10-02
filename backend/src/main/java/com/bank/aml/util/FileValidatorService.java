@@ -84,7 +84,7 @@ public class FileValidatorService {
 
         // Strip null bytes and directory traversal sequences
         String clean = filename.replace("\0", "").trim();
-        clean = clean.replaceAll("[/\\\\.]+\\/", ""); // Remove ../ or ..\
+        clean = clean.replaceAll("[/\\\\.]+[\\/\\\\]", ""); // Remove ../ or ..\
         clean = clean.replaceAll("^[/\\\\]+", "");     // Remove leading slashes
         clean = clean.replaceAll("[^a-zA-Z0-9.\\-_ ]", "_"); // Only allow safe chars
 

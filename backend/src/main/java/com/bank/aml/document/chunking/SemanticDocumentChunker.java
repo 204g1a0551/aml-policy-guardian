@@ -46,10 +46,19 @@ public class SemanticDocumentChunker implements DocumentChunker {
 
                 // Check for section heading
                 if (isSectionHeader(para)) {
+                    if (currentChunkText.length() > 0 && !currentChunkText.toString().trim().isEmpty()) {
+                        chunks.add(createChunk(
+                            chunkIndex++,
+                            pageNumber,
+                            currentSection,
+                            currentChunkText.toString().trim(),
+                            documentId,
+                            docMetadata
+                        ));
+                        currentChunkText = new StringBuilder();
+                    }
                     currentSection = extractSectionTitle(para);
-                }
-
-                if (currentChunkText.length() + para.length() > maxChars && currentChunkText.length() > 0) {
+                } else if (currentChunkText.length() + para.length() > maxChars && currentChunkText.length() > 0) {
                     // Flush current chunk
                     chunks.add(createChunk(
                         chunkIndex++,

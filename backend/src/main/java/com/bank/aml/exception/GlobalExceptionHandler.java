@@ -2,6 +2,7 @@ package com.bank.aml.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -97,6 +98,16 @@ public class GlobalExceptionHandler {
         problem.setTitle("Input Validation Error");
         problem.setType(URI.create("https://api.bank.internal/errors/validation-error"));
         problem.setProperty("code", "AML-VAL-4000");
+        problem.setProperty("timestamp", OffsetDateTime.now());
+        return problem;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Malformed JSON request payload.");
+        problem.setTitle("Malformed JSON Request");
+        problem.setType(URI.create("https://api.bank.internal/errors/malformed-json"));
+        problem.setProperty("code", "AML-VAL-4001");
         problem.setProperty("timestamp", OffsetDateTime.now());
         return problem;
     }

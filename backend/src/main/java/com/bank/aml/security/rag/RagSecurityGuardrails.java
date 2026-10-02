@@ -26,7 +26,7 @@ public class RagSecurityGuardrails {
         Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+instructions?", Pattern.CASE_INSENSITIVE),
         Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above|system|policy)\\s+(instructions?|rules?|guidelines?)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("(you\\s+are\\s+now\\s+in|enable|enter)\\s+(developer|dan|jailbreak|unfiltered|god)\\s+mode", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("bypass\\s+(all\\s+)?(safety|security|compliance|aml)\\s+(filters?|policies|rules?)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("bypass\\s+(all\\s+)?(safety|security|compliance|aml|\\s+)+(filters?|policies|rules?)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("system\\s+override", Pattern.CASE_INSENSITIVE),
         Pattern.compile("act\\s+as\\s+(an?\\s+)?(unrestricted|evil|unfiltered|jailbroken)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("do\\s+anything\\s+now", Pattern.CASE_INSENSITIVE)
@@ -34,9 +34,9 @@ public class RagSecurityGuardrails {
 
     // System Prompt & Secret Extraction Patterns
     private static final List<Pattern> EXTRACTION_PATTERNS = List.of(
-        Pattern.compile("reveal\\s+(the\\s+|your\\s+)?(system\\s+prompt|initial\\s+instructions?|system\\s+instructions?)", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("(print|show|output|repeat|dump)\\s+(the\\s+|your\\s+)?(system\\s+prompt|initial\\s+instructions?|system\\s+instructions?|hidden\\s+prompt)", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("(what\\s+are\\s+your|tell\\s+me\\s+your)\\s+(system\\s+instructions?|initial\\s+prompts?)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("reveal\\s+(the\\s+|your\\s+)?((initial|system)\\s+)+(prompt|instructions?)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("(print|show|output|repeat|dump)\\s+(the\\s+|your\\s+)?((initial|system)\\s+)*(prompt|instructions?|hidden\\s+prompt)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("(what\\s+are\\s+your|tell\\s+me\\s+your)\\s+((initial|system)\\s+)*(instructions?|prompts?)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("(reveal|show|print|output|extract|dump)\\s+(all\\s+)?(secrets?|keys?|api_key|jwt_secret|passwords?|credentials?|database_url)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("return\\s+(all\\s+)?hidden\\s+documents?", Pattern.CASE_INSENSITIVE)
     );
