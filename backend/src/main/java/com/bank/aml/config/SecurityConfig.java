@@ -70,13 +70,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Strict origin whitelist to prevent cross-origin data exfiltration
-        config.setAllowedOrigins(List.of(
-            "http://localhost:4200",
-            "http://127.0.0.1:4200",
-            "http://localhost",
-            "https://localhost",
-            "http://localhost:80"
+        // Strict origin pattern whitelist to allow internal, tunneling, and AWS deployments while blocking untrusted origins
+        config.setAllowedOriginPatterns(List.of(
+            "http://localhost*",
+            "https://localhost*",
+            "http://127.0.0.1*",
+            "https://127.0.0.1*",
+            "https://*.loca.lt*",
+            "https://*.ngrok-free.app*",
+            "https://*.trycloudflare.com*",
+            "https://*.amazonaws.com*"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Correlation-ID"));
