@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aml-guardian
+
+resources:
+  - 00-namespace.yaml
+  - 01-configmap.yaml
+  - 02-secret.yaml
+  - 03-postgres-pgvector.yaml
+  - 04-redis.yaml
+  - 05-kafka-kraft.yaml
+  - 06-backend.yaml
+  - 07-frontend.yaml
+  - 08-ingress.yaml
+  - 09-hpa.yaml
+  - 10-pdb.yaml
+  - 11-networkpolicy.yaml

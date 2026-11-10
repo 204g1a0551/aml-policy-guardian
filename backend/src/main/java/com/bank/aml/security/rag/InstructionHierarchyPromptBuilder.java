@@ -64,7 +64,11 @@ public class InstructionHierarchyPromptBuilder {
             for (int i = 0; i < retrievedChunks.size(); i++) {
                 ChunkSimilarityProjection chunk = retrievedChunks.get(i);
                 String cleanSection = chunk.getSection() != null ? chunk.getSection() : "General Standards";
-                String cleanText = RagSecurityGuardrails.sanitizeRetrievedChunkText(chunk.getChunkText());
+                String textToInclude = chunk.getChunkText();
+                if (chunk instanceof com.bank.aml.rag.ScoredChunk scored && scored.getParentChunkText() != null && !scored.getParentChunkText().isBlank()) {
+                    textToInclude = scored.getParentChunkText();
+                }
+                String cleanText = RagSecurityGuardrails.sanitizeRetrievedChunkText(textToInclude);
 
                 contextBuilder.append("<compliance_chunk index=\"").append(i + 1)
                               .append("\" doc_id=\"").append(chunk.getDocumentId())

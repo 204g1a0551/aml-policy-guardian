@@ -10,9 +10,17 @@ public record ChatMessageResponse(
     String role,
     String content,
     List<CitationResponse> citations,
-    OffsetDateTime createdAt
+    OffsetDateTime createdAt,
+    Double evidenceQualityScore,
+    String evidenceLevel,
+    Boolean isRefusal,
+    String retrievalStrategy
 ) {
+    public ChatMessageResponse(UUID id, UUID sessionId, String role, String content, List<CitationResponse> citations, OffsetDateTime createdAt) {
+        this(id, sessionId, role, content, citations, createdAt, null, null, false, null);
+    }
+
     public ChatMessageResponse(UUID id, String role, String content, List<CitationResponse> citations, OffsetDateTime createdAt) {
-        this(id, null, role, content, citations, createdAt);
+        this(id, null, role, content, citations, createdAt, null, null, false, null);
     }
 }

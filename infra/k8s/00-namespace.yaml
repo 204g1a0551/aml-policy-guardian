@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aml-guardian
+  labels:
+    app.kubernetes.io/name: aml-policy-guardian
+    app.kubernetes.io/part-of: aml-compliance-platform
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

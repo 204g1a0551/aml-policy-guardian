@@ -29,6 +29,9 @@ public class User {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "tenant_id", nullable = false, length = 50)
+    private String tenantId = "default-bank";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -77,6 +80,9 @@ public class User {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

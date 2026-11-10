@@ -566,3 +566,57 @@ aws ec2 delete-route-table --route-table-id $PUB_RTB_ID --region $AWS_REGION
 aws ec2 delete-vpc --vpc-id $VPC_ID --region $AWS_REGION
 echo "Cleanup complete! All AWS resources successfully deleted."
 ```
+
+---
+
+## 7. Kubernetes (EKS) Operations Runbook
+
+### 7.1 Terraform Infrastructure Provisioning
+```bash
+cd infra/terraform
+
+# 1. Initialize Terraform
+terraform init
+
+# 2. Plan AWS Infrastructure (VPC, RDS PostgreSQL, ElastiCache Redis, Amazon EKS)
+terraform plan -out=tfplan -var="db_password=StrongMasterPassword123!"
+
+# 3. Apply Infrastructure
+terraform apply tfplan
+
+# 4. Connect kubectl to the Amazon EKS cluster
+aws eks update-kubeconfig --region us-east-1 --name aml-prod-eks
+kubectl get nodes
+```
+
+### 7.2 Kubernetes Stack Deployment (Kustomize)
+```bash
+# 1. Inspect manifests
+kubectl kustomize infra/k8s
+
+# 2. Apply all namespace, secret, configmap, storage, streaming, and deployment resources
+kubectl apply -k infra/k8s
+
+# 3. Verify Rollout Status
+kubectl rollout status deployment/aml-backend -n aml-guardian
+kubectl rollout status deployment/aml-frontend -n aml-guardian
+kubectl rollout status deployment/kafka -n aml-guardian
+kubectl rollout status deployment/redis -n aml-guardian
+kubectl rollout status statefulset/postgres -n aml-guardian
+
+# 4. Check Pods and Endpoints
+kubectl get pods,svc,hpa,ingress -n aml-guardian
+```
+
+### 7.3 Zero-Downtime Rolling Image Update
+```bash
+# Trigger rolling update of the backend image
+kubectl set image deployment/aml-backend backend=204g1a0551/aml-assistant-backend:v1.1.0 -n aml-guardian
+
+# Watch rollout with zero downtime (MaxUnavailable: 0 guarantees existing pods handle traffic until new pods pass readiness probes)
+kubectl rollout status deployment/aml-backend -n aml-guardian
+
+# Rollback immediately if required
+kubectl rollout undo deployment/aml-backend -n aml-guardian
+```
+

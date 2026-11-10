@@ -1,7 +1,9 @@
 package com.bank.aml.service;
 
+import com.bank.aml.config.RagProperties;
 import com.bank.aml.dto.request.AskQuestionRequest;
 import com.bank.aml.dto.request.CreateChatSessionRequest;
+import com.bank.aml.dto.request.RetrievalFilterDto;
 import com.bank.aml.dto.response.ChatMessageResponse;
 import com.bank.aml.dto.response.ChatSessionResponse;
 import com.bank.aml.dto.response.ChatStreamEvent;
@@ -9,10 +11,9 @@ import com.bank.aml.dto.response.CitationResponse;
 import com.bank.aml.entity.ChatMessage;
 import com.bank.aml.entity.ChatSession;
 import com.bank.aml.entity.Document;
-import com.bank.aml.rag.LlmGenerationService;
+import com.bank.aml.rag.*;
 import com.bank.aml.repository.ChatMessageRepository;
 import com.bank.aml.repository.ChatSessionRepository;
-import com.bank.aml.repository.ChunkSimilarityProjection;
 import com.bank.aml.repository.DocumentRepository;
 import com.bank.aml.security.SecurityUserPrincipal;
 import com.bank.aml.security.rag.*;
@@ -36,6 +37,45 @@ public class RagChatService {
     private final LlmGenerationService llmGenerationService;
     private final RagOutputValidator outputValidator;
     private final SecurityAuditService securityAuditService;
+    private final CitationVerificationService citationVerificationService;
+    private final EvidenceQualityEvaluator evidenceQualityEvaluator;
+    private final RagProperties ragProperties;
+    private final com.bank.aml.security.alert.SecurityAlertService securityAlertService;
+    private final com.bank.aml.security.pii.PiiRedactionService piiRedactionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.bank.aml.observability.RagObservabilityService observabilityService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RagChatService(
+        ChatSessionRepository chatSessionRepository,
+        ChatMessageRepository chatMessageRepository,
+        DocumentRepository documentRepository,
+        AuthorizedRetrievalService authorizedRetrievalService,
+        InstructionHierarchyPromptBuilder promptBuilder,
+        LlmGenerationService llmGenerationService,
+        RagOutputValidator outputValidator,
+        SecurityAuditService securityAuditService,
+        CitationVerificationService citationVerificationService,
+        EvidenceQualityEvaluator evidenceQualityEvaluator,
+        RagProperties ragProperties,
+        com.bank.aml.security.alert.SecurityAlertService securityAlertService,
+        com.bank.aml.security.pii.PiiRedactionService piiRedactionService
+    ) {
+        this.chatSessionRepository = chatSessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.documentRepository = documentRepository;
+        this.authorizedRetrievalService = authorizedRetrievalService;
+        this.promptBuilder = promptBuilder;
+        this.llmGenerationService = llmGenerationService;
+        this.outputValidator = outputValidator;
+        this.securityAuditService = securityAuditService;
+        this.citationVerificationService = citationVerificationService;
+        this.evidenceQualityEvaluator = evidenceQualityEvaluator;
+        this.ragProperties = ragProperties;
+        this.securityAlertService = securityAlertService;
+        this.piiRedactionService = piiRedactionService;
+    }
 
     public RagChatService(
         ChatSessionRepository chatSessionRepository,
@@ -47,14 +87,21 @@ public class RagChatService {
         RagOutputValidator outputValidator,
         SecurityAuditService securityAuditService
     ) {
-        this.chatSessionRepository = chatSessionRepository;
-        this.chatMessageRepository = chatMessageRepository;
-        this.documentRepository = documentRepository;
-        this.authorizedRetrievalService = authorizedRetrievalService;
-        this.promptBuilder = promptBuilder;
-        this.llmGenerationService = llmGenerationService;
-        this.outputValidator = outputValidator;
-        this.securityAuditService = securityAuditService;
+        this(
+            chatSessionRepository,
+            chatMessageRepository,
+            documentRepository,
+            authorizedRetrievalService,
+            promptBuilder,
+            llmGenerationService,
+            outputValidator,
+            securityAuditService,
+            new CitationVerificationService(),
+            new EvidenceQualityEvaluator(),
+            new RagProperties(),
+            null,
+            new com.bank.aml.security.pii.PiiRedactionService()
+        );
     }
 
     @Transactional
@@ -63,14 +110,14 @@ public class RagChatService {
             ? request.title().trim()
             : "AML Investigation " + UUID.randomUUID().toString().substring(0, 8);
 
-        ChatSession session = new ChatSession(user.getId(), title);
+        String tenantId = user.getTenantId() != null ? user.getTenantId() : "default-bank";
+        ChatSession session = new ChatSession(user.getId(), title, tenantId);
         ChatSession saved = chatSessionRepository.save(session);
         return new ChatSessionResponse(saved.getId(), saved.getUserId(), saved.getTitle(), Collections.emptyList(), saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getUserSessions(SecurityUserPrincipal user) {
-        // Enforce user isolation: only fetch sessions belonging to the authenticated user
         List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(user.getId());
         return sessions.stream()
             .map(s -> new ChatSessionResponse(s.getId(), s.getUserId(), s.getTitle(), Collections.emptyList(), s.getCreatedAt(), s.getUpdatedAt()))
@@ -102,17 +149,34 @@ public class RagChatService {
 
     @Transactional
     public ChatMessageResponse askQuestion(UUID sessionId, AskQuestionRequest request, SecurityUserPrincipal user) {
-        // 1. Authorize session ownership (Prevent cross-user context leakage)
+        long startTotal = System.nanoTime();
+        // 1. Authorize session ownership
         ChatSession session = authorizedRetrievalService.validateSessionAccess(sessionId, user);
 
         String userQuery = request.message().trim();
-        String requestId = UUID.randomUUID().toString();
+        String correlationId = com.bank.aml.security.correlation.CorrelationIdContext.getCorrelationId();
+        String requestId = correlationId;
+        RetrievalFilterDto filters = request.filters();
 
-        // 2. Input Validation & Guardrail Scan (Direct prompt injection, system prompt extraction, delimiter breakouts)
+        // 2. Input Validation & Guardrail Scan
         RagSecurityGuardrails.ScanResult scanResult = guardrails.scanUserQuery(userQuery);
 
         if (!scanResult.safe()) {
-            // Record security incident in audit log
+            if (securityAlertService != null) {
+                securityAlertService.triggerAlert(
+                    "PROMPT_INJECTION_DETECTED",
+                    "HIGH",
+                    user.getId(),
+                    null,
+                    Map.of(
+                        "attackType", scanResult.attackType(),
+                        "reason", scanResult.reason(),
+                        "riskScore", scanResult.riskScore(),
+                        "sessionId", sessionId.toString()
+                    )
+                );
+            }
+
             securityAuditService.recordSecurityEvent(
                 user.getId(),
                 "PROMPT_INJECTION_BLOCKED",
@@ -127,23 +191,82 @@ public class RagChatService {
                 )
             );
 
-            // Persist user question
             ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
             chatMessageRepository.save(userMsg);
 
-            // Refusal response
             String refusal = "I am an authorized AML Compliance Assistant. I can only provide guidance grounded in approved bank compliance policies. I cannot execute instructions that waive statutory AML requirements, override reporting thresholds, or disclose internal system parameters.";
             ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", refusal);
             ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
 
-            return new ChatMessageResponse(savedAssistantMsg.getId(), "ASSISTANT", refusal, Collections.emptyList(), savedAssistantMsg.getCreatedAt());
+            if (observabilityService != null) {
+                observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startTotal), true, false);
+            }
+
+            return new ChatMessageResponse(
+                savedAssistantMsg.getId(),
+                sessionId,
+                "ASSISTANT",
+                refusal,
+                Collections.emptyList(),
+                savedAssistantMsg.getCreatedAt(),
+                0.0,
+                "INSUFFICIENT",
+                true,
+                "BLOCKED_BY_GUARDRAIL"
+            );
         }
 
-        // 3. Authorized Vector Retrieval (Only READY documents)
-        List<ChunkSimilarityProjection> retrievedChunks = authorizedRetrievalService.retrieveAuthorizedContext(scanResult.sanitizedInput(), user);
+        // Apply PII Redaction before sending query to models or prompt builder
+        String sanitizedQuery = scanResult.sanitizedInput();
+        if (piiRedactionService != null) {
+            com.bank.aml.security.pii.PiiRedactionService.RedactionResult pii = piiRedactionService.redact(sanitizedQuery);
+            if (pii.piiDetected()) {
+                securityAuditService.recordSecurityEvent(
+                    user.getId(),
+                    "PII_REDACTED_FROM_QUERY",
+                    "CHAT_QUERY",
+                    sessionId.toString(),
+                    requestId,
+                    Map.of("redactedCategories", pii.redactedCategories(), "count", pii.redactionsCount())
+                );
+                sanitizedQuery = pii.redactedText();
+            }
+        }
 
-        // 4. Scan retrieved chunks for indirect prompt injection attempts
-        for (ChunkSimilarityProjection chunk : retrievedChunks) {
+        // 3. Advanced Hybrid Retrieval (pgvector + tsvector + RRF + Reranker)
+        List<ScoredChunk> retrievedChunks = authorizedRetrievalService.retrieveAuthorizedContext(
+            sanitizedQuery, user, filters
+        );
+
+        // 4. Check for Explicit Insufficient-Evidence Policy
+        if (retrievedChunks.isEmpty()) {
+            ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
+            chatMessageRepository.save(userMsg);
+
+            String refusal = "I cannot find sufficient guidance in the approved AML compliance policies to answer this inquiry. In accordance with bank compliance governance, please consult the Money Laundering Reporting Officer (MLRO) or refer to the primary policy library.";
+            ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", refusal);
+            ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
+
+            if (observabilityService != null) {
+                observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startTotal), true, false);
+            }
+
+            return new ChatMessageResponse(
+                savedAssistantMsg.getId(),
+                sessionId,
+                "ASSISTANT",
+                refusal,
+                Collections.emptyList(),
+                savedAssistantMsg.getCreatedAt(),
+                0.0,
+                "INSUFFICIENT",
+                true,
+                "INSUFFICIENT_EVIDENCE"
+            );
+        }
+
+        // 5. Scan retrieved chunks for indirect prompt injection attempts
+        for (ScoredChunk chunk : retrievedChunks) {
             if (guardrails.containsIndirectInjection(chunk.getChunkText())) {
                 securityAuditService.recordSecurityEvent(
                     user.getId(),
@@ -160,16 +283,20 @@ public class RagChatService {
             }
         }
 
-        // 5. Instruction Hierarchy & Secure Prompt Boundary Assembly
+        // 6. Instruction Hierarchy & Secure Prompt Assembly
         InstructionHierarchyPromptBuilder.AssembledPrompt assembledPrompt = promptBuilder.buildSecurePrompt(
             scanResult.sanitizedInput(),
-            retrievedChunks
+            new ArrayList<>(retrievedChunks)
         );
 
-        // 6. LLM Generation
+        // 7. LLM Generation
+        long startGen = System.nanoTime();
         String rawGeneratedAnswer = llmGenerationService.generateAnswer(assembledPrompt);
+        if (observabilityService != null) {
+            observabilityService.recordGeneration(java.time.Duration.ofNanos(System.nanoTime() - startGen), ragProperties.getLlmModel());
+        }
 
-        // 7. Output Validation & Secret Leakage Inspection
+        // 8. Output Validation
         RagOutputValidator.OutputValidationResult outputValidation = outputValidator.validateOutput(rawGeneratedAnswer);
         String finalAnswer = outputValidation.validatedContent();
 
@@ -187,78 +314,112 @@ public class RagChatService {
             );
         }
 
-        // 8. Persist User and Assistant Messages
+        // 9. Claim-to-Citation Verification
+        Map<UUID, Document> documentsMap = loadDocumentsMap(retrievedChunks);
+        List<CitationResponse> verifiedCitations = citationVerificationService.verifyAndEnrichCitations(
+            finalAnswer, retrievedChunks, documentsMap
+        );
+
+        // 10. Calibrated Evidence Quality Assessment
+        boolean isRefusal = finalAnswer.contains("I cannot find sufficient guidance") || !outputValidation.valid();
+        EvidenceQualityEvaluator.EvidenceAssessment assessment = evidenceQualityEvaluator.assessEvidence(
+            userQuery, retrievedChunks, verifiedCitations, isRefusal
+        );
+
+        // 11. Persist User and Assistant Messages
         ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
         chatMessageRepository.save(userMsg);
 
         ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", finalAnswer);
         ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
 
-        // 9. Build Citations from retrieved chunks
-        List<CitationResponse> citations = buildCitations(retrievedChunks);
+        // 12. Audit Logging
+        String strategyUsed = filters != null && filters.retrievalStrategy() != null
+            ? filters.retrievalStrategy()
+            : ragProperties.getRetrievalStrategy();
 
-        // 10. Audit Logging for RAG Execution
         securityAuditService.recordSecurityEvent(
             user.getId(),
             "RAG_QUERY_EXECUTED",
             "CHAT_SESSION",
             sessionId.toString(),
             requestId,
-            Map.of("retrievedChunksCount", retrievedChunks.size(), "citationsCount", citations.size())
+            Map.of(
+                "retrievedChunksCount", retrievedChunks.size(),
+                "citationsCount", verifiedCitations.size(),
+                "evidenceLevel", assessment.level(),
+                "evidenceScore", assessment.score(),
+                "strategy", strategyUsed
+            )
         );
+
+        if (observabilityService != null) {
+            int promptTokens = Math.max(1, assembledPrompt.fullUserPrompt().length() / 4);
+            int completionTokens = Math.max(1, finalAnswer.length() / 4);
+            observabilityService.recordTokenUsage(promptTokens, completionTokens, ragProperties.getLlmModel());
+            observabilityService.recordEvidenceQuality(assessment.level(), assessment.score());
+            observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startTotal), isRefusal, false);
+        }
 
         return new ChatMessageResponse(
             savedAssistantMsg.getId(),
+            sessionId,
             "ASSISTANT",
             finalAnswer,
-            citations,
-            savedAssistantMsg.getCreatedAt()
+            verifiedCitations,
+            savedAssistantMsg.getCreatedAt(),
+            assessment.score(),
+            assessment.level(),
+            isRefusal,
+            strategyUsed
         );
     }
 
-    private List<CitationResponse> buildCitations(List<ChunkSimilarityProjection> chunks) {
-        if (chunks == null || chunks.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<CitationResponse> citations = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-
-        for (ChunkSimilarityProjection c : chunks) {
-            String key = c.getDocumentId() + ":" + c.getSection();
-            if (seen.add(key)) {
-                String docTitle = documentRepository.findById(c.getDocumentId())
-                    .map(Document::getTitle)
-                    .orElse("AML Compliance Document");
-
-                citations.add(new CitationResponse(
-                    c.getDocumentId(),
-                    docTitle,
-                    c.getSection() != null ? c.getSection() : "General Standards",
-                    c.getPageNumber() != null ? c.getPageNumber() : 1,
-                    c.getSimilarity()
-                ));
-            }
-        }
-
-        return citations;
+    public Flux<ChatStreamEvent> streamQuestion(UUID sessionId, String rawQuery, SecurityUserPrincipal user, String correlationId) {
+        return streamQuestion(sessionId, rawQuery, user, correlationId, null);
     }
 
-    public Flux<ChatStreamEvent> streamQuestion(UUID sessionId, String rawQuery, SecurityUserPrincipal user, String correlationId) {
-        // 1. Authorize session ownership
+    public Flux<ChatStreamEvent> streamQuestion(
+        UUID sessionId,
+        String rawQuery,
+        SecurityUserPrincipal user,
+        String correlationId,
+        RetrievalFilterDto filters
+    ) {
+        final String streamCorrelationId = (correlationId != null && !correlationId.isBlank())
+            ? correlationId
+            : com.bank.aml.security.correlation.CorrelationIdContext.getCorrelationId();
+        final long startStream = System.nanoTime();
+        final java.util.concurrent.atomic.AtomicBoolean firstTokenSeen = new java.util.concurrent.atomic.AtomicBoolean(false);
+
         ChatSession session = authorizedRetrievalService.validateSessionAccess(sessionId, user);
         String userQuery = rawQuery.trim();
 
-        // 2. Input Validation & Guardrail Scan
+        // Guardrail Scan
         RagSecurityGuardrails.ScanResult scanResult = guardrails.scanUserQuery(userQuery);
 
         if (!scanResult.safe()) {
+            if (securityAlertService != null) {
+                securityAlertService.triggerAlert(
+                    "PROMPT_INJECTION_DETECTED",
+                    "HIGH",
+                    user.getId(),
+                    null,
+                    Map.of(
+                        "attackType", scanResult.attackType(),
+                        "reason", scanResult.reason(),
+                        "riskScore", scanResult.riskScore(),
+                        "sessionId", sessionId.toString()
+                    )
+                );
+            }
+
             securityAuditService.recordSecurityEvent(
                 user.getId(),
                 "PROMPT_INJECTION_BLOCKED",
                 "CHAT_SESSION",
                 sessionId.toString(),
-                correlationId,
+                streamCorrelationId,
                 Map.of(
                     "attackType", scanResult.attackType(),
                     "reason", scanResult.reason(),
@@ -267,7 +428,6 @@ public class RagChatService {
                 )
             );
 
-            // Persist user and refusal messages
             ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
             chatMessageRepository.save(userMsg);
 
@@ -275,65 +435,103 @@ public class RagChatService {
             ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", refusal);
             ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
 
+            if (observabilityService != null) {
+                observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startStream), true, false);
+            }
+
             return Flux.just(
-                ChatStreamEvent.start(correlationId, sessionId),
-                ChatStreamEvent.token(correlationId, sessionId, refusal),
-                ChatStreamEvent.complete(correlationId, sessionId, savedAssistantMsg.getId())
+                ChatStreamEvent.start(streamCorrelationId, sessionId),
+                ChatStreamEvent.token(streamCorrelationId, sessionId, refusal),
+                ChatStreamEvent.complete(streamCorrelationId, sessionId, savedAssistantMsg.getId())
             );
         }
 
-        // 3. Authorized Vector Retrieval
-        List<ChunkSimilarityProjection> retrievedChunks = authorizedRetrievalService.retrieveAuthorizedContext(scanResult.sanitizedInput(), user);
-
-        // 4. Scan retrieved chunks for indirect prompt injection
-        for (ChunkSimilarityProjection chunk : retrievedChunks) {
-            if (guardrails.containsIndirectInjection(chunk.getChunkText())) {
+        // Apply PII Redaction
+        String sanitizedQuery = scanResult.sanitizedInput();
+        if (piiRedactionService != null) {
+            com.bank.aml.security.pii.PiiRedactionService.RedactionResult pii = piiRedactionService.redact(sanitizedQuery);
+            if (pii.piiDetected()) {
                 securityAuditService.recordSecurityEvent(
                     user.getId(),
-                    "MALICIOUS_DOCUMENT_INJECTION_FLAGGED",
-                    "DOCUMENT_CHUNK",
-                    chunk.getId().toString(),
-                    correlationId,
-                    Map.of(
-                        "documentId", chunk.getDocumentId().toString(),
-                        "section", chunk.getSection() != null ? chunk.getSection() : "unknown",
-                        "detectedText", chunk.getChunkText().substring(0, Math.min(100, chunk.getChunkText().length()))
-                    )
+                    "PII_REDACTED_FROM_QUERY",
+                    "CHAT_QUERY",
+                    sessionId.toString(),
+                    streamCorrelationId,
+                    Map.of("redactedCategories", pii.redactedCategories(), "count", pii.redactionsCount())
                 );
+                sanitizedQuery = pii.redactedText();
             }
         }
 
-        // 5. Build citations
-        List<CitationResponse> citations = buildCitations(retrievedChunks);
+        // Advanced Hybrid Retrieval
+        List<ScoredChunk> retrievedChunks = authorizedRetrievalService.retrieveAuthorizedContext(
+            sanitizedQuery, user, filters
+        );
 
-        // 6. Persist User Message immediately so inquiry is recorded even if stream is interrupted
+        if (retrievedChunks.isEmpty()) {
+            ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
+            chatMessageRepository.save(userMsg);
+
+            String refusal = "I cannot find sufficient guidance in the approved AML compliance policies to answer this inquiry. In accordance with bank compliance governance, please consult the Money Laundering Reporting Officer (MLRO) or refer to the primary policy library.";
+            ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", refusal);
+            ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
+
+            if (observabilityService != null) {
+                observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startStream), true, false);
+            }
+
+            return Flux.just(
+                ChatStreamEvent.start(streamCorrelationId, sessionId),
+                ChatStreamEvent.token(streamCorrelationId, sessionId, refusal),
+                ChatStreamEvent.complete(streamCorrelationId, sessionId, savedAssistantMsg.getId(), 0.0, "INSUFFICIENT")
+            );
+        }
+
+        // Build verified citations
+        Map<UUID, Document> documentsMap = loadDocumentsMap(retrievedChunks);
+        List<CitationResponse> initialCitations = citationVerificationService.verifyAndEnrichCitations(
+            userQuery, retrievedChunks, documentsMap
+        );
+
+        // Pre-assess evidence
+        EvidenceQualityEvaluator.EvidenceAssessment initialAssessment = evidenceQualityEvaluator.assessEvidence(
+            userQuery, retrievedChunks, initialCitations, false
+        );
+
+        String strategyUsed = filters != null && filters.retrievalStrategy() != null
+            ? filters.retrievalStrategy()
+            : ragProperties.getRetrievalStrategy();
+
+        // Persist User Message
         ChatMessage userMsg = new ChatMessage(sessionId, "USER", userQuery);
         chatMessageRepository.save(userMsg);
 
-        // Audit stream started
         securityAuditService.recordSecurityEvent(
             user.getId(),
             "RAG_STREAM_STARTED",
             "CHAT_SESSION",
             sessionId.toString(),
-            correlationId,
-            Map.of("retrievedChunksCount", retrievedChunks.size(), "citationsCount", citations.size())
+            streamCorrelationId,
+            Map.of("retrievedChunksCount", retrievedChunks.size(), "strategy", strategyUsed)
         );
 
-        // 7. Instruction Hierarchy Prompt Construction
         InstructionHierarchyPromptBuilder.AssembledPrompt assembledPrompt = promptBuilder.buildSecurePrompt(
             scanResult.sanitizedInput(),
-            retrievedChunks
+            new ArrayList<>(retrievedChunks)
         );
 
-        // 8. Stream execution with token accumulation, timeout, cancellation & completion handling
         StringBuilder accumulated = new StringBuilder();
 
         Flux<ChatStreamEvent> tokenEvents = llmGenerationService.streamAnswer(assembledPrompt)
             .timeout(Duration.ofSeconds(60))
             .map(token -> {
+                if (firstTokenSeen.compareAndSet(false, true)) {
+                    if (observabilityService != null) {
+                        observabilityService.recordTimeToFirstToken(java.time.Duration.ofNanos(System.nanoTime() - startStream));
+                    }
+                }
                 accumulated.append(token);
-                return ChatStreamEvent.token(correlationId, sessionId, token);
+                return ChatStreamEvent.token(streamCorrelationId, sessionId, token);
             })
             .doOnCancel(() -> {
                 securityAuditService.recordSecurityEvent(
@@ -341,7 +539,7 @@ public class RagChatService {
                     "RAG_STREAM_CANCELLED",
                     "CHAT_SESSION",
                     sessionId.toString(),
-                    correlationId,
+                    streamCorrelationId,
                     Map.of("partialLength", accumulated.length())
                 );
                 if (accumulated.length() > 0) {
@@ -350,21 +548,24 @@ public class RagChatService {
                 }
             })
             .onErrorResume(e -> {
+                if (observabilityService != null) {
+                    observabilityService.recordModelFailure(e.getMessage());
+                    observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startStream), false, true);
+                }
                 securityAuditService.recordSecurityEvent(
                     user.getId(),
                     "RAG_STREAM_FAILED",
                     "CHAT_SESSION",
                     sessionId.toString(),
-                    correlationId,
+                    streamCorrelationId,
                     Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown stream error")
                 );
-                return Flux.just(ChatStreamEvent.error(correlationId, sessionId, "Streaming response encountered an error: " + e.getMessage()));
+                return Flux.just(ChatStreamEvent.error(streamCorrelationId, sessionId, "Streaming response encountered an error: " + e.getMessage()));
             });
 
-        // Combine: START event -> CITATIONS event -> TOKEN events -> COMPLETE event
         Flux<ChatStreamEvent> startEvents = Flux.just(
-            ChatStreamEvent.start(correlationId, sessionId),
-            ChatStreamEvent.citations(correlationId, sessionId, citations)
+            ChatStreamEvent.start(streamCorrelationId, sessionId),
+            ChatStreamEvent.citations(streamCorrelationId, sessionId, initialCitations, initialAssessment.score(), initialAssessment.level(), strategyUsed)
         );
 
         Mono<ChatStreamEvent> completionEvent = Mono.defer(() -> {
@@ -372,35 +573,53 @@ public class RagChatService {
             RagOutputValidator.OutputValidationResult outputValidation = outputValidator.validateOutput(rawGeneratedAnswer);
             String finalAnswer = outputValidation.validatedContent();
 
-            if (!outputValidation.valid()) {
-                securityAuditService.recordSecurityEvent(
-                    user.getId(),
-                    "OUTPUT_VALIDATION_VIOLATION",
-                    "CHAT_SESSION",
-                    sessionId.toString(),
-                    correlationId,
-                    Map.of(
-                        "violationType", outputValidation.violationType(),
-                        "violationDetail", outputValidation.violationDetail()
-                    )
-                );
-            }
-
             ChatMessage assistantMsg = new ChatMessage(sessionId, "ASSISTANT", finalAnswer);
             ChatMessage savedAssistantMsg = chatMessageRepository.save(assistantMsg);
+
+            List<CitationResponse> finalCitations = citationVerificationService.verifyAndEnrichCitations(
+                finalAnswer, retrievedChunks, documentsMap
+            );
+            EvidenceQualityEvaluator.EvidenceAssessment finalAssessment = evidenceQualityEvaluator.assessEvidence(
+                userQuery, retrievedChunks, finalCitations, finalAnswer.contains("I cannot find sufficient guidance")
+            );
 
             securityAuditService.recordSecurityEvent(
                 user.getId(),
                 "RAG_STREAM_COMPLETED",
                 "CHAT_SESSION",
                 sessionId.toString(),
-                correlationId,
-                Map.of("finalLength", finalAnswer.length())
+                streamCorrelationId,
+                Map.of("finalLength", finalAnswer.length(), "evidenceScore", finalAssessment.score())
             );
 
-            return Mono.just(ChatStreamEvent.complete(correlationId, sessionId, savedAssistantMsg.getId()));
+            if (observabilityService != null) {
+                observabilityService.recordGeneration(java.time.Duration.ofNanos(System.nanoTime() - startStream), ragProperties.getLlmModel());
+                int promptTokens = Math.max(1, assembledPrompt.fullUserPrompt().length() / 4);
+                int completionTokens = Math.max(1, finalAnswer.length() / 4);
+                observabilityService.recordTokenUsage(promptTokens, completionTokens, ragProperties.getLlmModel());
+                observabilityService.recordEvidenceQuality(finalAssessment.level(), finalAssessment.score());
+                observabilityService.recordTotalRequest(java.time.Duration.ofNanos(System.nanoTime() - startStream), finalAnswer.contains("I cannot find sufficient guidance"), false);
+            }
+
+            return Mono.just(ChatStreamEvent.complete(
+                streamCorrelationId, sessionId, savedAssistantMsg.getId(), finalAssessment.score(), finalAssessment.level()
+            ));
         });
 
         return startEvents.concatWith(tokenEvents).concatWith(completionEvent);
+    }
+
+    private Map<UUID, Document> loadDocumentsMap(List<ScoredChunk> chunks) {
+        Set<UUID> docIds = new HashSet<>();
+        for (ScoredChunk c : chunks) {
+            docIds.add(c.getDocumentId());
+        }
+        Map<UUID, Document> map = new HashMap<>();
+        if (!docIds.isEmpty()) {
+            for (Document d : documentRepository.findAllById(docIds)) {
+                map.put(d.getId(), d);
+            }
+        }
+        return map;
     }
 }

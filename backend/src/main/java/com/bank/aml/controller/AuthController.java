@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -43,8 +44,20 @@ public class AuthController {
             principal.getUsername(),
             principal.getUsername(), // Display name fallback
             principal.getUsername() + "@bank.internal",
-            roles
+            roles,
+            principal.getTenantId()
         );
         return ResponseEntity.ok(profile);
+    }
+
+    @GetMapping("/sso/config")
+    public ResponseEntity<Map<String, Object>> getSsoConfig() {
+        return ResponseEntity.ok(authenticationService.getSsoConfig());
+    }
+
+    @PostMapping("/sso/exchange")
+    public ResponseEntity<AuthTokenResponse> exchangeSsoToken(@RequestBody Map<String, String> payload) {
+        String token = payload.get("token");
+        return ResponseEntity.ok(authenticationService.exchangeSsoToken(token));
     }
 }

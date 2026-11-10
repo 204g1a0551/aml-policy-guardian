@@ -11,5 +11,11 @@ public record StreamQuestionRequest(
     @JsonAlias({"query", "content", "prompt", "inquiry"})
     @NotBlank(message = "Message inquiry must not be blank")
     @Size(max = 2000, message = "Inquiry must not exceed 2000 characters")
-    String message
-) {}
+    String message,
+
+    RetrievalFilterDto filters
+) {
+    public StreamQuestionRequest(UUID sessionId, String message) {
+        this(sessionId, message, null);
+    }
+}

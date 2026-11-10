@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AskQuestionRequest, ChatMessage, ChatSession, ChatStreamEvent, Citation, CreateChatSessionRequest } from '../models/chat.models';
+import { AskQuestionRequest, ChatMessage, ChatSession, ChatStreamEvent, Citation, CreateChatSessionRequest, RetrievalComparisonResponse, RetrievalFilter } from '../models/chat.models';
 import { AuthService } from './auth.service';
 
 @Injectable({
@@ -36,18 +36,25 @@ export class ChatService {
     return this.http.post<ChatMessage>(`${this.baseUrl}/sessions/${sessionId}/messages`, request);
   }
 
+  compareRetrieval(query: string, topK: number = 5): Observable<RetrievalComparisonResponse> {
+    return this.http.get<RetrievalComparisonResponse>(`${this.baseUrl}/retrieval/compare`, {
+      params: { query, topK: topK.toString() }
+    });
+  }
+
   async streamQuestion(
     sessionId: string,
     message: string,
     callbacks: {
       onStart?: (event: ChatStreamEvent) => void;
-      onCitations?: (citations: Citation[]) => void;
+      onCitations?: (citations: Citation[], event?: ChatStreamEvent) => void;
       onToken?: (token: string) => void;
       onComplete?: (event: ChatStreamEvent) => void;
       onError?: (error: Error) => void;
     },
     abortSignal?: AbortSignal,
-    correlationId?: string
+    correlationId?: string,
+    filters?: RetrievalFilter
   ): Promise<void> {
     const token = this.authService.getAccessToken();
     const corrId = correlationId || crypto.randomUUID();
@@ -60,7 +67,7 @@ export class ChatService {
         'Authorization': `Bearer ${token || ''}`,
         'X-Correlation-ID': corrId
       },
-      body: JSON.stringify({ sessionId, message }),
+      body: JSON.stringify({ sessionId, message, filters }),
       signal: abortSignal
     });
 
@@ -96,7 +103,7 @@ export class ChatService {
               break;
             case 'CITATIONS':
               if (event.citations) {
-                callbacks.onCitations?.(event.citations);
+                callbacks.onCitations?.(event.citations, event);
               }
               break;
             case 'TOKEN':

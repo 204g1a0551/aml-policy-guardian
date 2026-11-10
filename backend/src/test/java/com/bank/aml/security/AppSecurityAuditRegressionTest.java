@@ -67,13 +67,13 @@ public class AppSecurityAuditRegressionTest {
         mockMvc.perform(get("/actuator/health"))
             .andExpect(status().isOk());
 
-        // /actuator/metrics requires ADMIN authentication (returns 403 Forbidden unauthenticated)
+        // /actuator/metrics requires ADMIN authentication (returns 401 Unauthorized unauthenticated)
         mockMvc.perform(get("/actuator/metrics"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
 
         // /actuator/info requires ADMIN authentication
         mockMvc.perform(get("/actuator/info"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

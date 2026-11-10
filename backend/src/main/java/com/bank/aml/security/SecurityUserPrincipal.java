@@ -15,6 +15,7 @@ public class SecurityUserPrincipal implements UserDetails {
     private final String username;
     private final String password;
     private final boolean enabled;
+    private final String tenantId;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public SecurityUserPrincipal(User user) {
@@ -22,9 +23,19 @@ public class SecurityUserPrincipal implements UserDetails {
         this.username = user.getUsername();
         this.password = user.getPasswordHash();
         this.enabled = user.isEnabled();
+        this.tenantId = user.getTenantId() != null ? user.getTenantId() : "default-bank";
         this.authorities = user.getRoles() != null
             ? user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toSet())
             : java.util.Collections.emptySet();
+    }
+
+    public SecurityUserPrincipal(UUID id, String username, String password, boolean enabled, String tenantId, Collection<? extends GrantedAuthority> authorities) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.enabled = enabled;
+        this.tenantId = tenantId != null ? tenantId : "default-bank";
+        this.authorities = authorities;
     }
 
     public static SecurityUserPrincipal create(User user) {
@@ -33,6 +44,10 @@ public class SecurityUserPrincipal implements UserDetails {
 
     public UUID getId() {
         return id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
     }
 
     @Override

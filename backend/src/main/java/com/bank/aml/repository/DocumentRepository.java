@@ -16,4 +16,16 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Optional<Document> findByFilename(String filename);
     Optional<Document> findBySha256ChecksumAndStatusNot(String sha256Checksum, String status);
     boolean existsBySha256ChecksumAndStatusNot(String sha256Checksum, String status);
+
+    List<Document> findByTenantIdAndStatusNot(String tenantId, String status);
+    List<Document> findByTenantIdAndStatus(String tenantId, String status);
+    List<Document> findByTenantIdAndDocumentTypeAndStatusNot(String tenantId, String documentType, String status);
+    boolean existsByTenantIdAndSha256ChecksumAndStatusNot(String tenantId, String sha256Checksum, String status);
+
+    List<Document> findByTenantIdAndPolicyCodeOrderByCreatedAtDesc(String tenantId, String policyCode);
+    Optional<Document> findByTenantIdAndPolicyCodeAndIsEffectiveTrue(String tenantId, String policyCode);
+    List<Document> findByTenantIdAndIsEffectiveTrue(String tenantId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d.policyCode FROM Document d WHERE d.tenantId = :tenantId AND d.policyCode IS NOT NULL ORDER BY d.policyCode ASC")
+    List<String> findDistinctPolicyCodesByTenantId(@org.springframework.data.repository.query.Param("tenantId") String tenantId);
 }

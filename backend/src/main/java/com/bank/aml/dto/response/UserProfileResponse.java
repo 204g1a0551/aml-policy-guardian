@@ -8,5 +8,10 @@ public record UserProfileResponse(
     String username,
     String fullName,
     String email,
-    List<String> roles
-) {}
+    List<String> roles,
+    String tenantId
+) {
+    public UserProfileResponse(UUID id, String username, String fullName, String email, List<String> roles) {
+        this(id, username, fullName, email, roles, "default-bank");
+    }
+}

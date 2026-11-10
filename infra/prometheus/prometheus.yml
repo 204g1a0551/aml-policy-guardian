@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'aml-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['backend:8080']
+        labels:
+          application: 'aml-policy-guardian-backend'
+          environment: 'production'

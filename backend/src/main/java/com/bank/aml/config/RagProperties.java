@@ -12,6 +12,25 @@ public class RagProperties {
     private int topK = 5;
     private double similarityThreshold = 0.72;
 
+    private String retrievalStrategy = "HYBRID_RERANK";
+    private double rrfK = 60.0;
+    private double vectorWeight = 0.6;
+    private double keywordWeight = 0.4;
+    private String rerankerStrategy = "LEXICAL_SEMANTIC_CROSS_ENCODER";
+    private boolean parentChildEnabled = true;
+    private boolean multiQueryEnabled = true;
+    private double evidenceQualityThreshold = 0.65;
+    private boolean insufficientEvidenceAbstention = true;
+    private String llmModel = "gemini-1.5-flash";
+
+    public String getLlmModel() {
+        return llmModel;
+    }
+
+    public void setLlmModel(String llmModel) {
+        this.llmModel = llmModel;
+    }
+
     public int getChunkSize() {
         return chunkSize;
     }
@@ -42,5 +61,77 @@ public class RagProperties {
 
     public void setSimilarityThreshold(double similarityThreshold) {
         this.similarityThreshold = similarityThreshold;
+    }
+
+    public String getRetrievalStrategy() {
+        return retrievalStrategy;
+    }
+
+    public void setRetrievalStrategy(String retrievalStrategy) {
+        this.retrievalStrategy = retrievalStrategy;
+    }
+
+    public double getRrfK() {
+        return rrfK;
+    }
+
+    public void setRrfK(double rrfK) {
+        this.rrfK = rrfK;
+    }
+
+    public double getVectorWeight() {
+        return vectorWeight;
+    }
+
+    public void setVectorWeight(double vectorWeight) {
+        this.vectorWeight = vectorWeight;
+    }
+
+    public double getKeywordWeight() {
+        return keywordWeight;
+    }
+
+    public void setKeywordWeight(double keywordWeight) {
+        this.keywordWeight = keywordWeight;
+    }
+
+    public String getRerankerStrategy() {
+        return rerankerStrategy;
+    }
+
+    public void setRerankerStrategy(String rerankerStrategy) {
+        this.rerankerStrategy = rerankerStrategy;
+    }
+
+    public boolean isParentChildEnabled() {
+        return parentChildEnabled;
+    }
+
+    public void setParentChildEnabled(boolean parentChildEnabled) {
+        this.parentChildEnabled = parentChildEnabled;
+    }
+
+    public boolean isMultiQueryEnabled() {
+        return multiQueryEnabled;
+    }
+
+    public void setMultiQueryEnabled(boolean multiQueryEnabled) {
+        this.multiQueryEnabled = multiQueryEnabled;
+    }
+
+    public double getEvidenceQualityThreshold() {
+        return evidenceQualityThreshold;
+    }
+
+    public void setEvidenceQualityThreshold(double evidenceQualityThreshold) {
+        this.evidenceQualityThreshold = evidenceQualityThreshold;
+    }
+
+    public boolean isInsufficientEvidenceAbstention() {
+        return insufficientEvidenceAbstention;
+    }
+
+    public void setInsufficientEvidenceAbstention(boolean insufficientEvidenceAbstention) {
+        this.insufficientEvidenceAbstention = insufficientEvidenceAbstention;
     }
 }

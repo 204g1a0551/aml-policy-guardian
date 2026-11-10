@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ChatService } from '../../core/services/chat.service';
-import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.models';
+import { ChatMessage, ChatSession, Citation, RetrievalComparisonResponse } from '../../core/models/chat.models';
 
 @Component({
   selector: 'app-chat',
@@ -87,6 +87,24 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
           </div>
 
           <div class="toolbar-right">
+            <select 
+              class="strategy-select" 
+              [ngModel]="selectedStrategy()" 
+              (ngModelChange)="selectedStrategy.set($event)"
+              title="Select RAG Retrieval Strategy"
+            >
+              <option value="HYBRID_RERANK">Hybrid (RRF + Rerank)</option>
+              <option value="HYBRID">Hybrid (pgvector + FTS)</option>
+              <option value="VECTOR_ONLY">Dense Vector Only</option>
+            </select>
+            <button 
+              type="button" 
+              class="btn-benchmark" 
+              (click)="openBenchmarkModal()"
+              title="Compare Vector vs Keyword vs Hybrid vs Reranking"
+            >
+              <span>Benchmark Strategies</span>
+            </button>
             <button 
               type="button" 
               class="stream-toggle" 
@@ -165,10 +183,19 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
 
                 @if (msg.role !== 'USER') {
                   <div class="entry-badge-wrap">
-                    @if (isRefusalMessage(msg.content)) {
-                      <span class="badge-status status-warning">GUARDRAIL: REFUSAL / OUT OF SCOPE</span>
+                    @if (msg.evidenceLevel === 'HIGH') {
+                      <span class="badge-status status-ready" title="Authoritative policy corroboration with verified document citations">EVIDENCE: HIGH ({{ ((msg.evidenceQualityScore || 0) * 100) | number:'1.0-0' }}%)</span>
+                    } @else if (msg.evidenceLevel === 'MEDIUM') {
+                      <span class="badge-status status-info" title="Direct policy guidance identified and verified">EVIDENCE: MEDIUM ({{ ((msg.evidenceQualityScore || 0) * 100) | number:'1.0-0' }}%)</span>
+                    } @else if (msg.evidenceLevel === 'LOW') {
+                      <span class="badge-status status-warning" title="Marginal policy alignment; analyst manual review recommended">EVIDENCE: LOW</span>
+                    } @else if (isRefusalMessage(msg.content) || msg.isRefusal) {
+                      <span class="badge-status status-warning">GUARDRAIL: REFUSAL / INSUFFICIENT EVIDENCE</span>
                     } @else {
                       <span class="badge-status status-ready">GROUNDED IN APPROVED POLICY</span>
+                    }
+                    @if (msg.retrievalStrategy) {
+                      <span class="strategy-badge">{{ msg.retrievalStrategy }}</span>
                     }
                   </div>
                 }
@@ -202,6 +229,9 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                       <div class="citation-card" (click)="openSourceDetail(cite)">
                         <div class="cite-top">
                           <span class="cite-title">{{ cite.documentTitle }}</span>
+                          @if (cite.verified) {
+                            <span class="cite-verified-pill" title="Factual claims corroborated by policy excerpt">&#x2714; Verified</span>
+                          }
                           <span class="cite-match">{{ ((cite.similarityScore || cite.similarity || 0) * 100) | number:'1.0-0' }}% Align</span>
                         </div>
                         <div class="cite-coords">
@@ -212,8 +242,8 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
                             <span class="cite-page">Page {{ cite.pageNumber }}</span>
                           }
                         </div>
-                        @if (cite.chunkSnippet) {
-                          <blockquote class="cite-snippet">"{{ cite.chunkSnippet }}"</blockquote>
+                        @if (cite.snippet || cite.chunkSnippet) {
+                          <blockquote class="cite-snippet">"{{ cite.snippet || cite.chunkSnippet }}"</blockquote>
                         }
                       </div>
                     }
@@ -349,6 +379,72 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
             </div>
             <div class="enterprise-modal-footer">
               <button type="button" class="btn-secondary" (click)="closeSourceDetail()">Close</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Retrieval Strategy Benchmark Modal -->
+      @if (showCompareModal()) {
+        <div class="enterprise-modal-backdrop" (click)="closeBenchmarkModal()">
+          <div class="enterprise-modal-dialog modal-wide" (click)="$event.stopPropagation()">
+            <div class="enterprise-modal-header">
+              <h3>Retrieval Strategy Benchmark & Multi-Model Comparison</h3>
+              <button type="button" class="enterprise-modal-close" (click)="closeBenchmarkModal()">&times;</button>
+            </div>
+            <div class="enterprise-modal-body">
+              <div class="benchmark-search-row">
+                <input 
+                  type="text" 
+                  [(ngModel)]="benchmarkQuery" 
+                  placeholder="Enter regulatory query to benchmark retrieval strategies..."
+                  class="benchmark-input"
+                  (keydown.enter)="executeBenchmark()"
+                />
+                <button type="button" class="btn-benchmark-run" (click)="executeBenchmark()" [disabled]="isComparing()">
+                  @if (isComparing()) {
+                    <span>Benchmarking...</span>
+                  } @else {
+                    <span>Run Comparison</span>
+                  }
+                </button>
+              </div>
+
+              @if (comparisonResult()) {
+                <div class="benchmark-summary-bar">
+                  <span class="bm-stat">Total Comparison Time: <strong>{{ comparisonResult()?.totalComparisonTimeMs }}ms</strong></span>
+                  <span class="bm-rec">{{ comparisonResult()?.recommendation }}</span>
+                </div>
+
+                <div class="strategy-columns-grid">
+                  @for (key of ['HYBRID_RERANK', 'HYBRID', 'VECTOR_ONLY', 'KEYWORD_ONLY']; track key) {
+                    @if (comparisonResult()?.strategies?.[key]; as strat) {
+                      <div class="strategy-col" [class.highlight-col]="key === 'HYBRID_RERANK'">
+                        <div class="strat-header">
+                          <span class="strat-title">{{ strat.strategyName }}</span>
+                          <span class="strat-latency">{{ strat.latencyMs }}ms</span>
+                        </div>
+                        <div class="strat-top-score">Top Score: {{ (strat.topScore * 100) | number:'1.1-1' }}%</div>
+                        <div class="strat-chunks-list">
+                          @for (chunk of strat.chunks; track chunk.chunkId) {
+                            <div class="strat-chunk-card">
+                              <div class="strat-chunk-top">
+                                <span class="strat-rank">#{{ chunk.rank }}</span>
+                                <span class="strat-doc">{{ chunk.documentTitle }}</span>
+                              </div>
+                              <div class="strat-chunk-sec">&sect; {{ chunk.section || 'General' }} &bull; p.{{ chunk.pageNumber }}</div>
+                              <div class="strat-chunk-snippet">"{{ chunk.snippet }}"</div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+            <div class="enterprise-modal-footer">
+              <button type="button" class="btn-secondary" (click)="closeBenchmarkModal()">Close</button>
             </div>
           </div>
         </div>
@@ -560,6 +656,198 @@ import { ChatMessage, ChatSession, Citation } from '../../core/models/chat.model
       display: flex;
       align-items: center;
       gap: 0.75rem;
+    }
+
+    .strategy-select {
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.75rem;
+      color: #1e293b;
+      outline: none;
+    }
+
+    .btn-benchmark {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      border-radius: 4px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
+
+    .btn-benchmark:hover {
+      background-color: #dbeafe;
+    }
+
+    .cite-verified-pill {
+      background-color: #ecfdf5;
+      color: #047857;
+      border: 1px solid #6ee7b7;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.05rem 0.35rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+
+    .status-info {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .strategy-badge {
+      background-color: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.1rem 0.35rem;
+      border-radius: 2px;
+      margin-left: 0.4rem;
+    }
+
+    .modal-wide {
+      max-width: 950px;
+      width: 95vw;
+    }
+
+    .benchmark-search-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .benchmark-input {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .btn-benchmark-run {
+      background-color: #1e3a8a;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.45rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-benchmark-run:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .benchmark-summary-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f1f5f9;
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.775rem;
+      color: #334155;
+      margin-bottom: 0.85rem;
+    }
+
+    .strategy-columns-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      max-height: 450px;
+      overflow-y: auto;
+    }
+
+    .strategy-col {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 0.65rem;
+    }
+
+    .strategy-col.highlight-col {
+      border-color: #3b82f6;
+      background-color: #f8fafc;
+    }
+
+    .strat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.25rem;
+    }
+
+    .strat-latency {
+      font-size: 0.7rem;
+      color: #059669;
+      font-weight: 600;
+    }
+
+    .strat-top-score {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+
+    .strat-chunks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .strat-chunk-card {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      padding: 0.4rem;
+      font-size: 0.725rem;
+    }
+
+    .strat-chunk-top {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+
+    .strat-rank {
+      color: #1d4ed8;
+    }
+
+    .strat-doc {
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .strat-chunk-sec {
+      color: #64748b;
+      font-size: 0.675rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .strat-chunk-snippet {
+      color: #475569;
+      font-style: italic;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .stream-toggle {
@@ -1124,6 +1412,12 @@ export class ChatComponent implements OnInit {
   private abortController: AbortController | null = null;
   private streamTimeoutId: any = null;
 
+  selectedStrategy = signal<'HYBRID_RERANK' | 'HYBRID' | 'VECTOR_ONLY'>('HYBRID_RERANK');
+  showCompareModal = signal(false);
+  isComparing = signal(false);
+  benchmarkQuery = '';
+  comparisonResult = signal<RetrievalComparisonResponse | null>(null);
+
   constructor(
     private chatService: ChatService,
     private route: ActivatedRoute,
@@ -1310,9 +1604,42 @@ export class ChatComponent implements OnInit {
     this.executeStreaming(sessionId, queryText);
   }
 
+  openBenchmarkModal(): void {
+    this.benchmarkQuery = this.currentQuery.trim() || 'What steps should I follow when a customer triggers a high-value transaction alert?';
+    this.showCompareModal.set(true);
+    if (!this.comparisonResult()) {
+      this.executeBenchmark();
+    }
+  }
+
+  closeBenchmarkModal(): void {
+    this.showCompareModal.set(false);
+  }
+
+  executeBenchmark(): void {
+    const q = this.benchmarkQuery.trim();
+    if (!q || this.isComparing()) return;
+
+    this.isComparing.set(true);
+    this.chatService.compareRetrieval(q, 5).subscribe({
+      next: (res) => {
+        this.comparisonResult.set(res);
+        this.isComparing.set(false);
+      },
+      error: (err) => {
+        this.isComparing.set(false);
+        this.chatError.set('Failed to execute retrieval benchmark: ' + (err?.error?.detail || err?.message));
+      }
+    });
+  }
+
   private executeSynchronous(sessionId: string, queryText: string): void {
     this.isStreaming.set(false);
-    this.chatService.askQuestion(sessionId, { message: queryText, query: queryText }).subscribe({
+    this.chatService.askQuestion(sessionId, {
+      message: queryText,
+      query: queryText,
+      filters: { retrievalStrategy: this.selectedStrategy() }
+    }).subscribe({
       next: (responseMsg) => {
         this.isGeneratingResponse.set(false);
         this.messages.update(msgs => [...msgs, responseMsg]);
@@ -1360,10 +1687,16 @@ export class ChatComponent implements OnInit {
         queryText,
         {
           onStart: () => {},
-          onCitations: (citations) => {
+          onCitations: (citations, event) => {
             this.messages.update(msgs => msgs.map(m => {
               if (m.id === assistantMsgId) {
-                return { ...m, citations };
+                return {
+                  ...m,
+                  citations,
+                  evidenceQualityScore: event?.evidenceQualityScore,
+                  evidenceLevel: event?.evidenceLevel,
+                  retrievalStrategy: event?.retrievalStrategy
+                };
               }
               return m;
             }));
@@ -1387,7 +1720,12 @@ export class ChatComponent implements OnInit {
             if (event.messageId) {
               this.messages.update(msgs => msgs.map(m => {
                 if (m.id === assistantMsgId) {
-                  return { ...m, id: event.messageId! };
+                  return {
+                    ...m,
+                    id: event.messageId!,
+                    evidenceQualityScore: event?.evidenceQualityScore || m.evidenceQualityScore,
+                    evidenceLevel: event?.evidenceLevel || m.evidenceLevel
+                  };
                 }
                 return m;
               }));
@@ -1400,7 +1738,9 @@ export class ChatComponent implements OnInit {
             this.handleStreamingError(sessionId, queryText, assistantMsgId, tokensReceived, err);
           }
         },
-        this.abortController.signal
+        this.abortController.signal,
+        undefined,
+        { retrievalStrategy: this.selectedStrategy() }
       );
     } catch (err: any) {
       if (this.streamTimeoutId) clearTimeout(this.streamTimeoutId);

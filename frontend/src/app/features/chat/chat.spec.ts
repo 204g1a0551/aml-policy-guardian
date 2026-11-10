@@ -187,12 +187,44 @@ describe('Chat Streaming & Synchronous E2E Service and Component', () => {
 
       expect(syncSpy).toHaveBeenCalledWith('sess-1', {
         message: 'What are CTR thresholds?',
-        query: 'What are CTR thresholds?'
+        query: 'What are CTR thresholds?',
+        filters: { retrievalStrategy: 'HYBRID_RERANK' }
       });
 
       expect(component.streamingNotice()).toContain('Automatically falling back to synchronous');
       const assistantMsg = component.messages().find(m => m.content === 'Synchronous fallback compliance answer.');
       expect(assistantMsg).toBeDefined();
+    });
+
+    it('should open benchmark modal and execute strategy comparison', () => {
+      const mockComparison: any = {
+        query: 'high-value alert',
+        totalComparisonTimeMs: 45,
+        strategies: {
+          HYBRID_RERANK: { strategyName: 'HYBRID_RERANK', latencyMs: 18, resultCount: 5, topScore: 0.94, chunks: [] }
+        },
+        strategyJaccardOverlap: { Vector_vs_Hybrid: 0.6 },
+        recommendation: 'HYBRID_RERANK delivers the highest precision'
+      };
+      const compareSpy = vi.spyOn(chatService, 'compareRetrieval').mockReturnValue(of(mockComparison));
+
+      component.currentQuery = 'high-value alert';
+      component.openBenchmarkModal();
+
+      expect(component.showCompareModal()).toBe(true);
+      expect(compareSpy).toHaveBeenCalledWith('high-value alert', 5);
+      expect(component.comparisonResult()).toEqual(mockComparison);
+
+      component.closeBenchmarkModal();
+      expect(component.showCompareModal()).toBe(false);
+    });
+
+    it('should support switching retrieval strategy between HYBRID_RERANK, HYBRID, and VECTOR_ONLY', () => {
+      expect(component.selectedStrategy()).toBe('HYBRID_RERANK');
+      component.selectedStrategy.set('HYBRID');
+      expect(component.selectedStrategy()).toBe('HYBRID');
+      component.selectedStrategy.set('VECTOR_ONLY');
+      expect(component.selectedStrategy()).toBe('VECTOR_ONLY');
     });
   });
 });

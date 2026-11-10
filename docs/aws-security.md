@@ -254,3 +254,22 @@ The frontend Nginx container terminates TLS or proxies behind Certbot:
 * **Database Level:** Immutable audit log table `audit_logs` records every transaction (user, action, timestamp, resource, correlation ID).
 * **Application Level:** Spring Boot security filter logs all authentication and authorization decisions to CloudWatch Logs group `/aws/ec2/aml-assistant/backend`.
 * **AWS Level:** AWS CloudTrail logs all management API calls (Secrets Manager reads, S3 access, RDS modifications).
+
+---
+
+## 9. Kubernetes & Container Hardening Controls
+
+### 9.1 Pod Security Standards
+The `aml-guardian` namespace applies Kubernetes Pod Security Standards:
+```yaml
+pod-security.kubernetes.io/enforce: baseline
+pod-security.kubernetes.io/audit: restricted
+pod-security.kubernetes.io/warn: restricted
+```
+
+### 9.2 Container Runtime Hardening
+1. **Unprivileged Execution:** Containers execute as non-root user `10001:10001` (`runAsNonRoot: true`). Root access is prohibited.
+2. **Capability Dropping:** Linux capabilities are stripped (`drop: ["ALL"]`) and `allowPrivilegeEscalation: false` prevents SUID exploits.
+3. **Container Image Integrity:** All images are verified with GitHub Actions vulnerability scans (`Trivy`, `TruffleHog` secret detector) prior to Amazon ECR registry push.
+4. **Network Segmentation (`NetworkPolicy`):** Default deny ingress network policy isolates pods. Direct ingress to PostgreSQL, Kafka, and Redis is blocked; only authorized backend pods can communicate with storage and messaging tiers.
+5. **Secrets at Rest in Kubernetes:** Sensitive credentials stored in Kubernetes Secrets are encrypted at rest using Amazon EKS envelope encryption integrated with AWS KMS.

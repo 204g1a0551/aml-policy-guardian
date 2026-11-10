@@ -2,6 +2,7 @@ package com.bank.aml.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.OffsetDateTime;
 
 public record DocumentUploadRequest(
     @NotBlank(message = "Title is required")
@@ -17,5 +18,14 @@ public record DocumentUploadRequest(
     String version,
 
     @Size(max = 255, message = "Source must not exceed 255 characters")
-    String source
-) {}
+    String source,
+
+    String policyCode,
+    String jurisdiction,
+    OffsetDateTime effectiveDate,
+    String approvalStatus
+) {
+    public DocumentUploadRequest(String title, String documentType, String version, String source) {
+        this(title, documentType, version, source, null, "GLOBAL", null, "APPROVED");
+    }
+}

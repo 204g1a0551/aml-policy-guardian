@@ -155,3 +155,97 @@ To provide production capabilities while minimizing operating expenditure:
 | **Monitoring** | CloudWatch Logs (1GB ingestion) | **$0.00** | Within AWS Free Tier (5GB free ingestion/month) |
 | **SSL/TLS** | Let's Encrypt / Certbot | **$0.00** | Zero-cost SSL automated via Nginx reverse proxy |
 | **Total** | | **~$27.11 / mo** | Optimized for banking proof-of-concept / pilot |
+
+---
+
+## 8. Enterprise Multi-AZ Kubernetes Architecture (Amazon EKS)
+
+For enterprise-scale production banking deployments requiring high availability, horizontal pod autoscaling, zero-downtime rolling upgrades, and strict regulatory segmentation, the platform deploys to **Amazon EKS v1.30**:
+
+### 8.1 EKS Architecture Diagram
+
+```mermaid
+flowchart TD
+    subgraph Users ["Client Layer"]
+        Analyst["Compliance Analysts & Auditors\n(Web Browser)"]
+    end
+
+    subgraph AWS_Cloud ["AWS Cloud (Multi-AZ Region)"]
+        subgraph Ingress_Layer ["Public Ingress"]
+            ALB["AWS Application Load Balancer\n(AWS ACM TLS Termination)"]
+        end
+
+        subgraph EKS_VPC ["VPC: 10.0.0.0/16"]
+            subgraph EKS_Cluster ["Amazon EKS Cluster (v1.30) — Namespace: aml-guardian"]
+                NIC["AWS Load Balancer Controller\n/ Nginx Ingress"]
+                
+                subgraph Frontend_Pods ["Frontend Pods (Angular 22 / Nginx)"]
+                    FE1["aml-frontend-pod-1"]
+                    FE2["aml-frontend-pod-2"]
+                end
+
+                subgraph Backend_Pods ["Backend Pods (Spring Boot 3.3.4 / JDK 21)"]
+                    BE1["aml-backend-pod-1"]
+                    BE2["aml-backend-pod-2"]
+                    HPA["HorizontalPodAutoscaler\n(CPU 75% / RAM 80% -> 2-10 Pods)"]
+                end
+
+                subgraph Messaging_Pods ["Event Streaming"]
+                    KF["Kafka Broker (KRaft Mode)\naml.document.* topics"]
+                end
+
+                subgraph Caching_Pods ["Distributed Caching"]
+                    RD["Redis 7.2 Cache\n(Tenant-isolated keys)"]
+                end
+
+                subgraph Security ["Kubernetes Security Controls"]
+                    NP["NetworkPolicy (Default Deny Ingress)"]
+                    PDB["PodDisruptionBudget (minAvailable: 1)"]
+                end
+            end
+
+            subgraph Private_Data_Tier ["Private Database Tier (Multi-AZ)"]
+                RDS[("Amazon Aurora PostgreSQL 16\n+ pgvector extension (Multi-AZ)")]
+                ELASTI[("Amazon ElastiCache Redis\n(Optional Managed Cache Alternative)")]
+            end
+        end
+    end
+
+    Analyst -->|HTTPS: 443| ALB
+    ALB --> NIC
+    NIC -->|Path: / | FE1 & FE2
+    NIC -->|Path: /api/* | BE1 & BE2
+    FE1 & FE2 -->|Internal API Proxy| BE1 & BE2
+    BE1 & BE2 -->|Vector Search & Metadata| RDS
+    BE1 & BE2 -->|Ingestion Events| KF
+    BE1 & BE2 -->|Retrieval Caching| RD
+    HPA -.->|Autoscale 2..10| BE1 & BE2
+```
+
+### 8.2 Kubernetes Manifest Hierarchy (`infra/k8s/`)
+
+The platform's infrastructure-as-code manifests are organized in [`infra/k8s/`](../infra/k8s/):
+* `00-namespace.yaml`: Enforces Kubernetes `pod-security.kubernetes.io/enforce: baseline`.
+* `01-configmap.yaml`: Centralized configuration (Spring profiles, Kafka/Redis endpoints, Actuator URLs).
+* `02-secret.yaml`: Secrets template for database credentials, JWT keys, and LLM tokens.
+* `03-postgres-pgvector.yaml`: PostgreSQL 16 StatefulSet with pgvector extension and persistent storage volume claims.
+* `04-redis.yaml`: Redis 7.2 deployment with LRU eviction and memory bounds.
+* `05-kafka-kraft.yaml`: Apache Kafka in KRaft mode for document ingestion events.
+* `06-backend.yaml`: RollingUpdate Deployment (2 replicas), liveness/readiness/startup probes, and non-root security context.
+* `07-frontend.yaml`: Hardened Nginx Angular SPA Deployment (2 replicas) with health checks.
+* `08-ingress.yaml`: Ingress controller routing `/api` to backend and `/` to frontend with SSL termination.
+* `09-hpa.yaml`: HorizontalPodAutoscaler scaling pods dynamically based on CPU/RAM utilization.
+* `10-pdb.yaml`: PodDisruptionBudgets preventing outages during node drains or cluster upgrades.
+* `11-networkpolicy.yaml`: Fine-grained network policies enforcing tenant isolation and pod-to-pod ingress/egress rules.
+* `kustomization.yaml`: Single-command deployment (`kubectl apply -k infra/k8s`).
+
+### 8.3 Terraform Infrastructure as Code (`infra/terraform/`)
+
+For automated provisioning of AWS cloud resources:
+* [`infra/terraform/versions.tf`](../infra/terraform/versions.tf): Terraform AWS provider constraints.
+* [`infra/terraform/variables.tf`](../infra/terraform/variables.tf): Configurable VPC CIDRs, instance classes, and cluster capacities.
+* [`infra/terraform/vpc.tf`](../infra/terraform/vpc.tf): Multi-AZ VPC with public, private app, and private DB subnets, plus S3 Gateway endpoint.
+* [`infra/terraform/rds.tf`](../infra/terraform/rds.tf): Amazon RDS PostgreSQL 16 with pgvector extension parameter group and KMS encryption.
+* [`infra/terraform/elasticache.tf`](../infra/terraform/elasticache.tf): Amazon ElastiCache Redis cluster configuration.
+* [`infra/terraform/eks.tf`](../infra/terraform/eks.tf): Amazon EKS cluster with managed worker node groups.
+* [`infra/terraform/outputs.tf`](../infra/terraform/outputs.tf): Infrastructure output endpoints and cluster metadata.

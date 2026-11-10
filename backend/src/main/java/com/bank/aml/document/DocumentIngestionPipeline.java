@@ -125,10 +125,16 @@ public class DocumentIngestionPipeline {
 
             DocumentChunk chunk = new DocumentChunk();
             chunk.setDocumentId(document.getId());
+            chunk.setTenantId(document.getTenantId() != null ? document.getTenantId() : "default-bank");
             chunk.setChunkIndex(payload.chunkIndex());
             chunk.setPageNumber(payload.pageNumber());
             chunk.setSection(payload.section());
             chunk.setChunkText(payload.text());
+            chunk.setIsParent(payload.isParent());
+            chunk.setChunkSummary(payload.summary());
+            chunk.setPolicyCode(document.getPolicyCode());
+            chunk.setIsEffective(document.getIsEffective() != null ? document.getIsEffective() : true);
+            chunk.setEffectiveDate(document.getEffectiveDate() != null ? document.getEffectiveDate() : java.time.OffsetDateTime.now());
 
             try {
                 chunk.setMetadata(objectMapper.writeValueAsString(payload.metadata()));

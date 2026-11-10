@@ -15,6 +15,9 @@ public class ChatSession {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "tenant_id", nullable = false, length = 50)
+    private String tenantId = "default-bank";
+
     @Column(nullable = false, length = 255)
     private String title;
 
@@ -27,8 +30,13 @@ public class ChatSession {
     public ChatSession() {}
 
     public ChatSession(UUID userId, String title) {
+        this(userId, title, "default-bank");
+    }
+
+    public ChatSession(UUID userId, String title, String tenantId) {
         this.userId = userId;
         this.title = title;
+        this.tenantId = (tenantId != null && !tenantId.isBlank()) ? tenantId : "default-bank";
         this.createdAt = OffsetDateTime.now();
         this.updatedAt = OffsetDateTime.now();
     }
@@ -43,6 +51,9 @@ public class ChatSession {
 
     public UUID getUserId() { return userId; }
     public void setUserId(UUID userId) { this.userId = userId; }
+
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

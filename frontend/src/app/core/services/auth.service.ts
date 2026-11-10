@@ -16,7 +16,8 @@ export class AuthService {
 
   isAuthenticated = computed(() => !!this.token());
   isAdmin = computed(() => this.currentUser()?.roles.includes('ROLE_ADMIN') ?? false);
-  isAnalyst = computed(() => this.currentUser()?.roles.includes('ROLE_ANALYST') ?? false);
+  isAnalyst = computed(() => this.currentUser()?.roles.some(r => r === 'ROLE_ANALYST' || r === 'ROLE_COMPLIANCE_ANALYST') ?? false);
+  isAuditor = computed(() => this.currentUser()?.roles.includes('ROLE_AUDITOR') ?? false);
 
   constructor(private http: HttpClient) {}
 

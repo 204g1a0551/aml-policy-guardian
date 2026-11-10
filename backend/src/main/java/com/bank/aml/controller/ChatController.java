@@ -31,15 +31,18 @@ public class ChatController {
 
     private final RagChatService ragChatService;
     private final com.bank.aml.repository.UserRepository userRepository;
+    private final com.bank.aml.rag.RetrievalComparisonService retrievalComparisonService;
     private final ObjectMapper objectMapper;
 
     public ChatController(
         RagChatService ragChatService,
         com.bank.aml.repository.UserRepository userRepository,
+        com.bank.aml.rag.RetrievalComparisonService retrievalComparisonService,
         ObjectMapper objectMapper
     ) {
         this.ragChatService = ragChatService;
         this.userRepository = userRepository;
+        this.retrievalComparisonService = retrievalComparisonService;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
@@ -109,6 +112,18 @@ public class ChatController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping("/retrieval/compare")
+    public ResponseEntity<com.bank.aml.dto.response.RetrievalComparisonResponse> compareRetrievalStrategies(
+        @RequestParam("query") String query,
+        @RequestParam(value = "topK", defaultValue = "5") int topK,
+        @AuthenticationPrincipal SecurityUserPrincipal user,
+        java.security.Principal principal
+    ) {
+        SecurityUserPrincipal resolved = resolvePrincipal(user, principal);
+        com.bank.aml.dto.response.RetrievalComparisonResponse comparison = retrievalComparisonService.compareStrategies(query, resolved, topK);
+        return ResponseEntity.ok(comparison);
+    }
+
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> streamChat(
         @RequestParam(value = "sessionId", required = false) UUID paramSessionId,
@@ -131,10 +146,12 @@ public class ChatController {
 
         String correlationId = (headerCorrelationId != null && !headerCorrelationId.isBlank())
             ? headerCorrelationId
-            : UUID.randomUUID().toString();
+            : com.bank.aml.security.correlation.CorrelationIdContext.getCorrelationId();
+
+        com.bank.aml.dto.request.RetrievalFilterDto filters = request != null ? request.filters() : null;
 
         final UUID finalSessionId = targetSessionId;
-        return ragChatService.streamQuestion(finalSessionId, message, resolved, correlationId)
+        return ragChatService.streamQuestion(finalSessionId, message, resolved, correlationId, filters)
             .map(event -> {
                 try {
                     String json = objectMapper.writeValueAsString(event);

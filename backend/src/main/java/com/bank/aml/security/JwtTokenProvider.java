@@ -37,6 +37,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
             .subject(principal.getUsername())
             .claim("userId", principal.getId().toString())
+            .claim("tenantId", principal.getTenantId() != null ? principal.getTenantId() : "default-bank")
             .claim("roles", roles)
             .issuedAt(now)
             .expiration(expiryDate)
@@ -61,5 +62,11 @@ public class JwtTokenProvider {
     public UUID getUserIdFromToken(String token) {
         Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
         return UUID.fromString(claims.get("userId", String.class));
+    }
+
+    public String getTenantIdFromToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        String tenant = claims.get("tenantId", String.class);
+        return (tenant != null && !tenant.isBlank()) ? tenant : "default-bank";
     }
 }

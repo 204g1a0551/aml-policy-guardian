@@ -2,6 +2,15 @@ spring:
   application:
     name: aml-assistant-backend
 
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/aml_assistant}
     username: ${DATABASE_USERNAME:postgres}
@@ -46,17 +55,60 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        rag.retrieval.latency: true
+        rag.reranking.latency: true
+        rag.generation.latency: true
+        rag.time_to_first_token: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        rag.retrieval.latency: 0.5, 0.95, 0.99
+        rag.reranking.latency: 0.5, 0.95, 0.99
+        rag.generation.latency: 0.5, 0.95, 0.99
+        rag.time_to_first_token: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: 1.0
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 3000
 
 app:
   jwt:
     secret: ${JWT_SECRET:4c8b21e8e561a37c02b9e6584dc74c207b822d56a282f1b402179836371ad5f3e9c704a43b2f515e1bc09a656711c1e550b06b9b3e02}
     expiration-ms: 3600000
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+    partitions: 3
+    replication-factor: 1
+  redis:
+    enabled: ${REDIS_ENABLED:false}
+  cache:
+    retrieval-ttl-minutes: 15
+    policy-ttl-minutes: 60

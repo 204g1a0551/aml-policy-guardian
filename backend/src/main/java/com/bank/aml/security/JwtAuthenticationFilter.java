@@ -45,6 +45,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // Enforce active account verification: reject disabled or locked accounts immediately
                 if (userDetails != null && userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
+                    if (userDetails instanceof SecurityUserPrincipal principal) {
+                        com.bank.aml.security.tenant.TenantContext.setTenantId(principal.getTenantId());
+                    }
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,

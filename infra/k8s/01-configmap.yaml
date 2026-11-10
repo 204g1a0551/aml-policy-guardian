@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aml-config
+  namespace: aml-guardian
+data:
+  SPRING_PROFILES_ACTIVE: "kubernetes,prod"
+  DATABASE_URL: "jdbc:postgresql://postgres.aml-guardian.svc.cluster.local:5432/aml_assistant"
+  DATABASE_USERNAME: "postgres"
+  SERVER_PORT: "8080"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.aml-guardian.svc.cluster.local:9092"
+  KAFKA_ENABLED: "true"
+  REDIS_HOST: "redis.aml-guardian.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_ENABLED: "true"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+  LLM_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  LLM_MODEL: "gemini-1.5-flash"
+  EMBEDDING_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  EMBEDDING_MODEL: "text-embedding-004"

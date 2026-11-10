@@ -12,8 +12,16 @@ public record ChatStreamEvent(
     String token,
     List<CitationResponse> citations,
     String error,
-    OffsetDateTime timestamp
+    OffsetDateTime timestamp,
+    Double evidenceQualityScore,
+    String evidenceLevel,
+    Boolean isRefusal,
+    String retrievalStrategy
 ) {
+    public ChatStreamEvent(String type, String correlationId, UUID sessionId, UUID messageId, String token, List<CitationResponse> citations, String error, OffsetDateTime timestamp) {
+        this(type, correlationId, sessionId, messageId, token, citations, error, timestamp, null, null, false, null);
+    }
+
     public static ChatStreamEvent start(String correlationId, UUID sessionId) {
         return new ChatStreamEvent("START", correlationId, sessionId, null, null, null, null, OffsetDateTime.now());
     }
@@ -22,12 +30,20 @@ public record ChatStreamEvent(
         return new ChatStreamEvent("CITATIONS", correlationId, sessionId, null, null, citations, null, OffsetDateTime.now());
     }
 
+    public static ChatStreamEvent citations(String correlationId, UUID sessionId, List<CitationResponse> citations, Double evidenceQualityScore, String evidenceLevel, String retrievalStrategy) {
+        return new ChatStreamEvent("CITATIONS", correlationId, sessionId, null, null, citations, null, OffsetDateTime.now(), evidenceQualityScore, evidenceLevel, false, retrievalStrategy);
+    }
+
     public static ChatStreamEvent token(String correlationId, UUID sessionId, String token) {
         return new ChatStreamEvent("TOKEN", correlationId, sessionId, null, token, null, null, OffsetDateTime.now());
     }
 
     public static ChatStreamEvent complete(String correlationId, UUID sessionId, UUID messageId) {
         return new ChatStreamEvent("COMPLETE", correlationId, sessionId, messageId, null, null, null, OffsetDateTime.now());
+    }
+
+    public static ChatStreamEvent complete(String correlationId, UUID sessionId, UUID messageId, Double evidenceScore, String evidenceLevel) {
+        return new ChatStreamEvent("COMPLETE", correlationId, sessionId, messageId, null, null, null, OffsetDateTime.now(), evidenceScore, evidenceLevel, false, null);
     }
 
     public static ChatStreamEvent error(String correlationId, UUID sessionId, String error) {

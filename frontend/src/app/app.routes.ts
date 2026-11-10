@@ -5,6 +5,7 @@ import { ChatComponent } from './features/chat/chat.component';
 import { HistoryComponent } from './features/history/history.component';
 import { DocumentsComponent } from './features/documents/documents.component';
 import { AuditComponent } from './features/audit/audit.component';
+import { QualityComponent } from './features/quality/quality.component';
 import { SettingsComponent } from './features/settings/settings.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
@@ -31,13 +32,18 @@ export const routes: Routes = [
     path: 'documents', 
     component: DocumentsComponent, 
     canActivate: [authGuard, roleGuard],
-    data: { expectedRoles: ['ROLE_ADMIN'] }
+    data: { expectedRoles: ['ROLE_ADMIN', 'ROLE_ANALYST', 'ROLE_COMPLIANCE_ANALYST', 'ROLE_AUDITOR'] }
   },
   { 
     path: 'admin/audit', 
     component: AuditComponent, 
     canActivate: [authGuard, roleGuard],
     data: { expectedRoles: ['ROLE_ADMIN'] }
+  },
+  { 
+    path: 'admin/quality', 
+    component: QualityComponent, 
+    canActivate: [authGuard] 
   },
   { 
     path: 'settings', 

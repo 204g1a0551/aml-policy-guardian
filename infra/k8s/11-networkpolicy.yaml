@@ -1,0 +1,104 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: aml-guardian
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Allow Ingress Controller to Frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend
+  namespace: aml-guardian
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aml-frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+
+---
+# Allow Ingress and Frontend to Backend API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-backend
+  namespace: aml-guardian
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aml-backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aml-frontend
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow external egress for LLM and Embedding API calls (HTTPS: 443) and CoreDNS (53)
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 53
+
+---
+# Allow Backend to access Postgres Database
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres
+  namespace: aml-guardian
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aml-backend
+      ports:
+        - protocol: TCP
+          port: 5432

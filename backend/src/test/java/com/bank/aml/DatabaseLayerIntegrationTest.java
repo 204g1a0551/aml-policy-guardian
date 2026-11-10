@@ -73,7 +73,7 @@ class DatabaseLayerIntegrationTest {
 
         assertThat(analyst).isPresent();
         assertThat(analyst.get().getEmail()).isEqualTo("analyst@bank.internal");
-        assertThat(analyst.get().getRoles()).extracting(Role::getName).containsOnly("ROLE_ANALYST");
+        assertThat(analyst.get().getRoles()).extracting(Role::getName).contains("ROLE_ANALYST");
         assertThat(passwordEncoder.matches("AdminPass123!", analyst.get().getPasswordHash())).isTrue();
     }
 

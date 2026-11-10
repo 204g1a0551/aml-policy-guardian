@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,7 +61,7 @@ class AuthAndAdminApiIntegrationTest {
             .andExpect(jsonPath("$.accessToken").isNotEmpty())
             .andExpect(jsonPath("$.tokenType").value("Bearer"))
             .andExpect(jsonPath("$.user.username").value("analyst"))
-            .andExpect(jsonPath("$.user.roles[0]").value("ROLE_ANALYST"))
+            .andExpect(jsonPath("$.user.roles", hasItem("ROLE_ANALYST")))
             .andReturn();
 
         AuthTokenResponse response = objectMapper.readValue(result.getResponse().getContentAsString(), AuthTokenResponse.class);

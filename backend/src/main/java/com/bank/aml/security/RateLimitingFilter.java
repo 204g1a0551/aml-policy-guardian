@@ -16,7 +16,8 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 
 /**
- * Filter that enforces rate limiting on sensitive authentication and RAG endpoints.
+ * Filter that enforces rate limiting on sensitive authentication, document ingestion, and RAG endpoints,
+ * emitting standard IETF X-RateLimit headers.
  */
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -36,16 +37,26 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         FilterChain filterChain
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
+        String method = request.getMethod();
         String clientIp = extractClientIp(request);
 
+        RateLimitingService.RateLimitDecision decision = null;
+
         if (path.startsWith("/api/v1/auth/login")) {
-            if (!rateLimitingService.allowLoginRequest(clientIp)) {
-                sendRateLimitResponse(response, "Too many login attempts. Please try again after 60 seconds.");
-                return;
-            }
+            decision = rateLimitingService.checkLoginRateLimit(clientIp);
         } else if (path.startsWith("/api/v1/chat")) {
-            if (!rateLimitingService.allowChatRequest(clientIp)) {
-                sendRateLimitResponse(response, "Too many chat queries. Please try again shortly.");
+            decision = rateLimitingService.checkChatRateLimit(clientIp);
+        } else if (path.startsWith("/api/v1/documents") && "POST".equalsIgnoreCase(method)) {
+            decision = rateLimitingService.checkUploadRateLimit(clientIp);
+        }
+
+        if (decision != null) {
+            response.setHeader("X-RateLimit-Limit", String.valueOf(decision.limit()));
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(decision.remaining()));
+            response.setHeader("X-RateLimit-Reset", String.valueOf(decision.resetTimeEpochSeconds()));
+
+            if (!decision.allowed()) {
+                sendRateLimitResponse(response, "Rate limit exceeded. Please wait before retrying.");
                 return;
             }
         }

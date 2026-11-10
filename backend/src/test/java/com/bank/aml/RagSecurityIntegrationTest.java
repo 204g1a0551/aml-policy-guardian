@@ -199,15 +199,15 @@ class RagSecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("7. Pre-Retrieval Authorization: Unauthenticated requests to /api/v1/chat/** are rejected with 403 Forbidden")
+    @DisplayName("7. Pre-Retrieval Authorization: Unauthenticated requests to /api/v1/chat/** are rejected with 401 Unauthorized")
     void testUnauthenticatedUserBlocked() throws Exception {
         mockMvc.perform(get("/api/v1/chat/sessions"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/v1/chat/sessions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"title\": \"Unauthorized Session\"}"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

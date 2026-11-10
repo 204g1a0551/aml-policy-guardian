@@ -60,6 +60,28 @@ public class DocumentController {
         return ResponseEntity.ok(document);
     }
 
+    @GetMapping("/jobs/{jobId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
+    public ResponseEntity<com.bank.aml.dto.response.IngestionJobResponse> getJobById(@PathVariable UUID jobId) {
+        var job = documentService.getIngestionJob(jobId);
+        return ResponseEntity.ok(com.bank.aml.dto.response.IngestionJobResponse.fromEntity(job));
+    }
+
+    @GetMapping("/{id}/job")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
+    public ResponseEntity<com.bank.aml.dto.response.IngestionJobResponse> getLatestJobForDocument(@PathVariable UUID id) {
+        return documentService.getLatestJobForDocument(id)
+            .map(job -> ResponseEntity.ok(com.bank.aml.dto.response.IngestionJobResponse.fromEntity(job)))
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/retry")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.bank.aml.dto.response.IngestionJobResponse> retryIngestion(@PathVariable UUID id) {
+        var job = documentService.retryIngestion(id);
+        return ResponseEntity.ok(com.bank.aml.dto.response.IngestionJobResponse.fromEntity(job));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteDocument(@PathVariable UUID id) {

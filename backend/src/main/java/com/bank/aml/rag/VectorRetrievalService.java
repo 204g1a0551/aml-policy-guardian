@@ -36,7 +36,63 @@ public class VectorRetrievalService {
      * Executes vector similarity search given an already formatted vector string.
      */
     public List<ChunkSimilarityProjection> searchSimilarChunks(String vectorString, double minSimilarity, int limit) {
-        return documentChunkRepository.findSimilarChunks(vectorString, minSimilarity, limit);
+        String tenantId = com.bank.aml.security.tenant.TenantContext.getTenantId();
+        return documentChunkRepository.findSimilarChunks(vectorString, minSimilarity, tenantId, limit);
+    }
+
+    /**
+     * Executes filtered vector search with optional document-level and section-level metadata filters.
+     */
+    public List<ChunkSimilarityProjection> searchSimilarChunksWithFilters(
+        float[] queryEmbedding,
+        double minSimilarity,
+        java.util.UUID documentId,
+        String documentType,
+        String section,
+        int limit
+    ) {
+        String tenantId = com.bank.aml.security.tenant.TenantContext.getTenantId();
+        String vectorString = formatVector(queryEmbedding);
+        return documentChunkRepository.findSimilarChunksWithFilters(
+            vectorString,
+            minSimilarity,
+            tenantId,
+            documentId,
+            documentType,
+            section,
+            limit
+        );
+    }
+
+    /**
+     * Executes PostgreSQL full-text search against the generated tsvector column.
+     */
+    public List<ChunkSimilarityProjection> searchChunksByKeyword(
+        String query,
+        java.util.UUID documentId,
+        String documentType,
+        String section,
+        int limit
+    ) {
+        if (query == null || query.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        String tenantId = com.bank.aml.security.tenant.TenantContext.getTenantId();
+        return documentChunkRepository.findChunksByKeywordSearch(
+            query.trim(),
+            tenantId,
+            documentId,
+            documentType,
+            section,
+            limit
+        );
+    }
+
+    public List<com.bank.aml.entity.DocumentChunk> findChunksByIds(List<java.util.UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return documentChunkRepository.findAllByIds(ids);
     }
 
     /**
